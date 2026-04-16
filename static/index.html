@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chat To SMS Docs – Safe Lanes</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- ── NAV BAR ─────────────────────────────────────────────── -->
+<header class="nav glass">
+  <div class="brand"><span class="logo">⚓</span> Safe Lanes</div>
+
+  <div class="nav-actions" id="navActions">
+    <button id="history-btn" class="action" title="Chat History"><i class="i-history"></i><span>History</span></button>
+    <button id="new-chat" class="action" title="New Chat"><i class="i-plus"></i><span>New</span></button>
+    <!-- badge injected by script.js -->
+  </div>
+</header>
+
+<p class="notice">AI answers can be inaccurate – always verify.</p>
+
+<!-- ── WORKSPACE (chat | viewer) ───────────────────────────── -->
+<main class="workspace">
+
+  <!-- CHAT -->
+  <section class="chat glass">
+    <h2 class="page-title">Chat To SMS Docs</h2>
+
+    <ul id="messages" class="messages"></ul>
+
+    <form id="chat-form" class="composer glass">
+      <textarea id="chat-input" placeholder="Ask anything …" rows="1" spellcheck="true"></textarea>
+      <button id="send-btn" title="Send"><i class="i-send"></i></button>
+    </form>
+  </section>
+
+  <!-- VIEWER -->
+  <aside id="doc-viewer" class="viewer">
+    <header class="viewer-head">
+      <span id="doc-title">Document viewer</span>
+      <button id="viewer-close" title="Close">✕</button>
+    </header>
+    <iframe id="doc-frame"></iframe>
+  </aside>
+</main>
+
+<footer class="page-foot">Powered by Safe Lane IT</footer>
+
+<!-- HISTORY PANEL -->
+<div id="history-pane" class="history-pane glass closed">
+  <header>
+    <span>Chat History</span>
+    <button id="history-close">✕</button>
+  </header>
+  <nav id="thread-list"></nav>
+</div>
+
+<!-- libs + logic -->
+<script src="https://cdn.jsdelivr.net/npm/showdown@1.9.1/dist/showdown.min.js"></script>
+
+<!-- tenant bootstrap (auto-detects client from URL) -->
+<script>
+(() => {
+  // 1. Figure out first path segment, e.g. "" | "maran" | "supereco"
+  const pathSegments = location.pathname.split('/').filter(Boolean);
+  const slug = pathSegments[0] || ''; // First segment after domain
+
+  // 2. Normalise special cases (root = RSMS)
+  const clientId   = slug || 'rsms';        // rsms / maran / supereco / …
+
+  // 3. Build API base ->  /api            (rsms)
+  //                       /maran/api      (maran)
+  //                       /supereco/api   (supereco)
+  //window.API_BASE      = slug ? `/${slug}/api` : '/api';
+
+    window.API_BASE = `/${clientId}/api`;  
+// 4. Pretty label for the UI badge
+  //window.CLIENT_LABEL  = clientId.toUpperCase();
+  // 4. Pretty label for the UI badge   
+  window.CLIENT_LABEL  = clientId.toUpperCase();
+  window.CLIENT_ID     = clientId;
+})();
+</script>
+
+
+<script src="/script.js"></script>
+<script src="/feedback-integration.js"></script>
+</body>
+</html>

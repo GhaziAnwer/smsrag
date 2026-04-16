@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: sms-rag-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount data directory (contains index_store for each client)
+      - /opt/sms-rag/data:/app/data:rw
+      # Mount docs directory (contains documents for each client)
+      - /opt/sms-rag/data:/app/docs:ro
+      # Mount databases
+      - ./chat_history.db:/app/chat_history.db:rw
+      - ./feedback.db:/app/feedback.db:rw
+      - ./query_logs.db:/app/query_logs.db:rw
+    environment:
+      - ENVIRONMENT=production
+      - DOCKER_CONTAINER=true
+      - BASE_DIR=/app/data
+      - DEFAULT_CLIENT_ID=rsms
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ALLOW_ORIGINS=https://chatai.sl-sail.com,https://sailerp.sl-sail.com,https://erp.sl-sail.com
+      - LOG_LEVEL=INFO
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sms-rag-network
+
+networks:
+  sms-rag-network:
+    driver: bridge
