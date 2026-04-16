@@ -1,0 +1,27 @@
+# Credentials
+.env
+*.env
+*.pem
+*.key
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# ChromaDB and index data
+chroma/
+index_store/
+*.jsonl
+*.sqlite3
+llamaparse_cache/
+
+# Large data folders
+D:/indexstores/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
