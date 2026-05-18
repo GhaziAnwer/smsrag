@@ -56,8 +56,7 @@ app.include_router(dashboard_router.router, prefix="/api/dashboard", tags=["dash
 #  DOCUMENT SERVING
 # --------------------------
 
-# DOCS_BASE_PATH = Path(os.getenv("BASE_DIR", "/opt/sms-rag/data"))
-DOCS_BASE_PATH = Path(os.getenv("DATA_ROOT", "data"))
+DOCS_BASE_PATH = Path(os.getenv("BASE_DIR", "/opt/sms-rag/data"))
 
 @app.get("/{client_id}/docs/{filename:path}")
 def serve_document(client_id: str, filename: str):
