@@ -28,8 +28,9 @@ env/
 nlpnew/
 
 # Local scratch tools
-tools/*
-!tools/sync_sms_documents.py
+# tools/*
+# !tools/sync_sms_documents.py
+# !tools/sync_sms_documents.py
 
 # Database files
 *.db
