@@ -27,6 +27,10 @@ env/
 .venv/
 nlpnew/
 
+# Local scratch tools
+tools/*
+!tools/sync_sms_documents.py
+
 # Database files
 *.db
 *.sqlite
@@ -43,6 +47,7 @@ data/
 # Logs
 *.log
 logs/
+.cache/
 
 # OS files
 .DS_Store
