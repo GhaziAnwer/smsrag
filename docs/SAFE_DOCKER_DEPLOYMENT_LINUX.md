@@ -72,6 +72,7 @@ By default, this writes runtime files under the data directory:
 /opt/sms-rag-index-data/_document_sync_logs/sms_document_sync.log
 /opt/sms-rag-index-data/_document_sync_logs/sms_document_sync.lock
 /opt/sms-rag-index-data/_document_sync_backups/
+/opt/sms-rag-index-data/_document_sync_repo/live-sms-documents/
 ```
 
 If you get a permission error, fix ownership for only this app data folder:

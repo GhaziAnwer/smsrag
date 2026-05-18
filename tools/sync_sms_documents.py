@@ -696,7 +696,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--repo-dir",
         type=Path,
-        default=Path(os.getenv("SMS_DOCS_REPO_DIR", root / ".cache" / "live-sms-documents")),
+        default=Path(os.getenv("SMS_DOCS_REPO_DIR")) if os.getenv("SMS_DOCS_REPO_DIR") else None,
         help="Local clone path for the source documents repo.",
     )
     parser.add_argument(
@@ -749,6 +749,10 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     args.data_dir = args.data_dir.expanduser().resolve()
+    if args.repo_dir is None:
+        args.repo_dir = args.data_dir / "_document_sync_repo" / "live-sms-documents"
+    else:
+        args.repo_dir = args.repo_dir.expanduser().resolve()
     if args.backup_dir is None:
         args.backup_dir = args.data_dir / "_document_sync_backups"
     if args.log_file is None:
