@@ -66,6 +66,21 @@ set +a
 python tools/sync_sms_documents.py --data-dir /opt/sms-rag-index-data
 ```
 
+By default, this writes runtime files under the data directory:
+
+```text
+/opt/sms-rag-index-data/_document_sync_logs/sms_document_sync.log
+/opt/sms-rag-index-data/_document_sync_logs/sms_document_sync.lock
+/opt/sms-rag-index-data/_document_sync_backups/
+```
+
+If you get a permission error, fix ownership for only this app data folder:
+
+```bash
+sudo mkdir -p /opt/sms-rag-index-data
+sudo chown -R ubuntu:ubuntu /opt/sms-rag-index-data
+```
+
 ## 4. Check Port Safety
 
 Confirm `8010` is free:

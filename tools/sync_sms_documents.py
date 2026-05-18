@@ -724,19 +724,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--backup-dir",
         type=Path,
-        default=Path(os.getenv("SMS_DOCS_BACKUP_DIR", root / "data" / "_document_sync_backups")),
+        default=Path(os.getenv("SMS_DOCS_BACKUP_DIR")) if os.getenv("SMS_DOCS_BACKUP_DIR") else None,
         help="Where overwritten destination documents are backed up.",
     )
     parser.add_argument(
         "--log-file",
         type=Path,
-        default=Path(os.getenv("SMS_DOCS_SYNC_LOG", root / "logs" / "sms_document_sync.log")),
+        default=Path(os.getenv("SMS_DOCS_SYNC_LOG")) if os.getenv("SMS_DOCS_SYNC_LOG") else None,
         help="Log file path.",
     )
     parser.add_argument(
         "--lock-file",
         type=Path,
-        default=Path(os.getenv("SMS_DOCS_SYNC_LOCK", root / "logs" / "sms_document_sync.lock")),
+        default=Path(os.getenv("SMS_DOCS_SYNC_LOCK")) if os.getenv("SMS_DOCS_SYNC_LOCK") else None,
         help="Prevents overlapping sync runs.",
     )
     parser.add_argument("--skip-pull", action="store_true", help="Use existing repo-dir without git pull.")
@@ -748,6 +748,13 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    args.data_dir = args.data_dir.expanduser().resolve()
+    if args.backup_dir is None:
+        args.backup_dir = args.data_dir / "_document_sync_backups"
+    if args.log_file is None:
+        args.log_file = args.data_dir / "_document_sync_logs" / "sms_document_sync.log"
+    if args.lock_file is None:
+        args.lock_file = args.data_dir / "_document_sync_logs" / "sms_document_sync.lock"
 
     setup_logging(args.log_file, args.verbose)
     log.info("=" * 72)
