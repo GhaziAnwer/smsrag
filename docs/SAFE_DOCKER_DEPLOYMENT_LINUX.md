@@ -35,9 +35,17 @@ SMSRAG_DATA_DIR=/opt/sms-rag-index-data
 BASE_DIR=/app/data
 DEFAULT_CLIENT_ID=rsms
 ALLOW_ORIGINS=*
+
+# Document source repo for auto sync/indexing
+SMS_DOCS_REPO_URL=https://github.com/pandeysury/liveClientDoc.git
+SMS_DOCS_REPO_BRANCH=main
+SMS_DOCS_GIT_TOKEN=your_git_token_if_repo_is_private
+SMS_DOCS_GIT_USERNAME=pandeysury
+SMS_RAG_CLIENTS=rsms,oceangold,supereco,almi
 ```
 
 Do not paste GitHub/GitLab tokens into code. Put repo tokens only in `.env` if needed.
+If the repo is public, remove `SMS_DOCS_GIT_TOKEN` and `SMS_DOCS_GIT_USERNAME`.
 
 ## 3. Prepare Data
 

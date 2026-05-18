@@ -150,9 +150,12 @@ def re_mask_basic_auth(text: str) -> str:
 def run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
     safe_cmd = " ".join(mask_secret(part) for part in cmd)
     log.debug("Running command: %s", safe_cmd)
+    env = os.environ.copy()
+    env.setdefault("GIT_TERMINAL_PROMPT", "0")
     proc = subprocess.run(
         cmd,
         cwd=str(cwd) if cwd else None,
+        env=env,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -192,12 +195,16 @@ def build_repo_url() -> str | None:
 
 def git_auth_args(repo_url: str | None) -> list[str]:
     """
-    Add temporary Git HTTPS auth when SMS_DOCS_GITLAB_TOKEN is provided.
+    Add temporary Git HTTPS auth when a token is provided.
 
     This avoids writing the token into the cloned repo's remote URL. If the URL
     already contains credentials, use it as-is for backward compatibility.
     """
-    token = os.getenv("SMS_DOCS_GITLAB_TOKEN")
+    token = (
+        os.getenv("SMS_DOCS_GIT_TOKEN")
+        or os.getenv("SMS_DOCS_GITHUB_TOKEN")
+        or os.getenv("SMS_DOCS_GITLAB_TOKEN")
+    )
     if not token or not repo_url:
         return []
 
@@ -205,7 +212,13 @@ def git_auth_args(repo_url: str | None) -> list[str]:
     if parsed.scheme not in {"http", "https"} or parsed.username or parsed.password:
         return []
 
-    username = os.getenv("SMS_DOCS_GITLAB_USERNAME", "oauth2")
+    default_username = "x-access-token" if (parsed.hostname or "").lower() == "github.com" else "oauth2"
+    username = (
+        os.getenv("SMS_DOCS_GIT_USERNAME")
+        or os.getenv("SMS_DOCS_GITHUB_USERNAME")
+        or os.getenv("SMS_DOCS_GITLAB_USERNAME")
+        or default_username
+    )
     raw = f"{username}:{token}".encode("utf-8")
     encoded = base64.b64encode(raw).decode("ascii")
     return ["-c", f"http.extraHeader=Authorization: Basic {encoded}"]
