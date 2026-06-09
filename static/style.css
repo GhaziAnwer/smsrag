@@ -63,6 +63,9 @@ body{display:flex;flex-direction:column}
 .viewer{flex:1;display:flex;flex-direction:column;background:#fafcff;position:relative}
 
 .page-title{font-size:18px;font-weight:600;text-align:left;opacity:.8}
+.page-subtitle{
+  font-size:14px;line-height:1.5;color:#46536b;margin:4px 12px 4px;
+}
 
 /* ─── MESSAGES ──────────────────────────────────────────────────── */
 .messages{
@@ -75,6 +78,38 @@ body{display:flex;flex-direction:column}
 .msg{max-width:88%;padding:12px 16px;border-radius:var(--radius);line-height:1.4}
 .msg.u {background:var(--accent-2);color:#fff;margin-left:auto;animation:fadeIn .25s}
 .msg.ai{background:#fff;animation:fadeIn .25s;max-width:95%}
+
+.chat-empty{
+  flex:1;list-style:none;display:flex;align-items:center;justify-content:center;
+  padding:32px 18px;color:#536079;text-align:center;
+}
+
+.empty-state{
+  max-width:360px;margin:0 auto;display:flex;flex-direction:column;
+  align-items:center;gap:12px;
+}
+
+.empty-icon{
+  width:76px;height:76px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;background:#f5f7fb;border:1px solid #e6ebf5;
+  box-shadow:0 10px 28px rgba(15,21,39,.06);
+}
+
+.empty-icon svg{
+  width:42px;height:42px;fill:none;stroke:#7b879d;stroke-width:2.4;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+
+.chat-empty .empty-icon svg{stroke:#c8d2e3}
+.chat-empty .empty-icon circle{fill:var(--accent);stroke:none}
+
+.empty-state h3{
+  font-size:18px;font-weight:700;color:#20283a;margin-top:4px;
+}
+
+.empty-state p{
+  font-size:14px;line-height:1.6;color:#536079;
+}
 
 /* ─── ANSWER CONTENT ───────────────────────────────────────────── */
 .answer-content{
@@ -198,6 +233,29 @@ body{display:flex;flex-direction:column}
 .doc-loaded {
   animation: successFlash 0.6s ease-out;
 }
+
+.viewer-empty{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:32px;text-align:center;background:#fafafa;color:#536079;
+}
+
+.viewer-empty h3{
+  margin-top:18px;font-size:22px;font-weight:700;color:#20283a;
+}
+
+.viewer-empty p{
+  margin-top:10px;font-size:14px;line-height:1.6;color:#536079;
+}
+
+.viewer-empty-note{
+  margin-top:18px;padding:11px 16px;border:1px solid #bcd4f3;
+  background:#edf5ff;color:#0b5fc2;border-radius:6px;
+  box-shadow:0 8px 18px rgba(23,84,255,.08);
+  font-size:14px;line-height:1.4;
+}
+
+.viewer.has-document .viewer-empty{display:none}
+.viewer:not(.has-document) iframe{display:none}
 
 .viewer iframe{
   flex:1 1 0%;width:100%;min-height:0;display:block;

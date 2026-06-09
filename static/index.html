@@ -30,6 +30,7 @@
   <!-- CHAT -->
   <section class="chat glass">
     <h2 class="page-title">Chat To SMS Docs</h2>
+    <!-- <p class="page-subtitle">Start a conversation by asking anything about your SMS documents.</p> -->
 
     <ul id="messages" class="messages"></ul>
 
@@ -42,9 +43,21 @@
   <!-- VIEWER -->
   <aside id="doc-viewer" class="viewer">
     <header class="viewer-head">
-      <span id="doc-title">Document viewer</span>
+      <span id="doc-title">Document Viewer (0)</span>
       <button id="viewer-close" title="Close">✕</button>
     </header>
+    <div id="viewer-empty" class="viewer-empty">
+      <div class="empty-icon" aria-hidden="true">
+        <svg viewBox="0 0 48 48" focusable="false">
+          <path d="M14 6h15l9 9v27H14z"></path>
+          <path d="M29 6v10h9"></path>
+          <path d="M20 24h14M20 31h14M20 38h9"></path>
+        </svg>
+      </div>
+      <h3>Document Viewer</h3>
+      <p>Open a reference document from the chat to preview it here.</p>
+      <!-- <div class="viewer-empty-note">💡 References from AI responses will appear here.</div> -->
+    </div>
     <iframe id="doc-frame"></iframe>
   </aside>
 </main>

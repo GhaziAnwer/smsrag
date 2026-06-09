@@ -1,10 +1,12 @@
 # app/routers/query.py - COMPLETE: Section-Aware + Document Summarization + SQLite history persistence
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from typing import List, Dict, Any, Optional
 from loguru import logger
 import os
 import time
 import re
+import json
 from urllib.parse import quote
 from collections import defaultdict
 
@@ -591,35 +593,18 @@ def _apply_reranking(question: str, nodes, use_reranker: bool = True) -> list:
 # ============================================================================
 # ANSWER SYNTHESIS - SECTION-AWARE + SUMMARIZATION
 # ============================================================================
-def _synthesize_answer(question: str, nodes: list, use_llm: bool = True, query_intent: dict = None) -> str:
-    """Generate answer from context with section-aware extraction and summarization support."""
-    if not nodes:
-        return "No relevant information found."
-    
+def _build_synthesis_request(question: str, nodes: list, query_intent: dict = None) -> Dict[str, Any]:
+    """Build the shared OpenAI request payload for normal and streaming answers."""
     is_compound = query_intent.get("is_compound", False) if query_intent else False
     is_summarization = query_intent.get("is_summarization", False) if query_intent else False
     intent_type = query_intent.get("type", "general") if query_intent else "general"
-    
+
     combined_context = "\n".join([
         _format_chunk_with_sections(n, i)
         for i, n in enumerate(nodes)
     ])
-    
-    if not use_llm:
-        return f"Based on the retrieved documents:\n\n{combined_context[:1500]}..."
-    
-    try:
-        from openai import OpenAI
-        
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            logger.warning("OPENAI_API_KEY not set")
-            return f"Based on the retrieved documents:\n\n{combined_context[:1500]}..."
-        
-        client = OpenAI(api_key=api_key)
-        
-        # Base system prompt
-        system_prompt = """You are a maritime documentation assistant with expertise in SMS procedures.
+
+    system_prompt = """You are a maritime documentation assistant with expertise in SMS procedures.
 
 **CRITICAL: SECTION-LEVEL ANALYSIS**
 
@@ -661,9 +646,8 @@ Each document contains MULTIPLE sections marked with 🔹 SECTION markers:
    - Am I answering what was asked, not just what the document title suggests?
    - If asked about "records", did I find and use the Recordkeeping section?
 """
-        # Add compound question handling
-        if is_compound:
-            system_prompt += """
+    if is_compound:
+        system_prompt += """
 
 ⚠️ **COMPOUND QUESTION DETECTED**:
 - This question asks MULTIPLE things (e.g., "When & How", "What & Why")
@@ -671,9 +655,8 @@ Each document contains MULTIPLE sections marked with 🔹 SECTION markers:
 - Structure with clear sections for each part
 """
 
-        # Add summarization handling
-        if is_summarization:
-            system_prompt += """
+    if is_summarization:
+        system_prompt += """
 
 📄 **DOCUMENT SUMMARIZATION REQUESTED**:
 - User wants an OVERVIEW or SUMMARY of a document/topic
@@ -718,9 +701,8 @@ Each document contains MULTIPLE sections marked with 🔹 SECTION markers:
   **Source:** [write the actual document title(s) from the context — never write placeholder text literally]
 """
 
-        # Add MCQ generation handling
-        if query_intent.get('is_mcq'):
-            system_prompt += """
+    if query_intent and query_intent.get('is_mcq'):
+        system_prompt += """
 
 📝 **MCQ GENERATION RULES**:
 - Number questions as Q1, Q2, Q3 ... (NOT 1. 2. 3.)
@@ -742,7 +724,7 @@ Each document contains MULTIPLE sections marked with 🔹 SECTION markers:
 - Include the correct answer after each question
 """
 
-        user_prompt = f"""Question: {question}
+    user_prompt = f"""Question: {question}
 
 Query Intent: {intent_type}
 
@@ -750,31 +732,57 @@ Documents (SCAN ALL SECTIONS - look for 🔹 markers):
 
 {combined_context}
 
-REMEMBER: {"Generate well-structured MCQ questions from the document content!" if query_intent.get('is_mcq') else ("Synthesize across all chunks to provide a comprehensive summary!" if is_summarization else "The answer might be in a section at the END of a document. Scan completely!")}
+REMEMBER: {"Generate well-structured MCQ questions from the document content!" if query_intent and query_intent.get('is_mcq') else ("Synthesize across all chunks to provide a comprehensive summary!" if is_summarization else "The answer might be in a section at the END of a document. Scan completely!")}
 
 Answer:"""
 
-        # Adjust max_tokens based on intent
-        if query_intent.get('is_mcq'):
-            max_tokens = 2000
-        elif is_summarization:
-            max_tokens = 1500
-        else:
-            max_tokens = 1200
-        
+    if query_intent and query_intent.get('is_mcq'):
+        max_tokens = 2000
+    elif is_summarization:
+        max_tokens = 1500
+    else:
+        max_tokens = 1200
+
+    return {
+        "combined_context": combined_context,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "max_tokens": max_tokens,
+    }
+
+def _synthesize_answer(question: str, nodes: list, use_llm: bool = True, query_intent: dict = None) -> str:
+    """Generate answer from context with section-aware extraction and summarization support."""
+    if not nodes:
+        return "No relevant information found."
+
+    synthesis_request = _build_synthesis_request(question, nodes, query_intent)
+    combined_context = synthesis_request["combined_context"]
+
+    if not use_llm:
+        return f"Based on the retrieved documents:\n\n{combined_context[:1500]}..."
+
+    try:
+        from openai import OpenAI
+
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("OPENAI_API_KEY not set")
+            return f"Based on the retrieved documents:\n\n{combined_context[:1500]}..."
+
+        client = OpenAI(api_key=api_key)
+
         response = client.chat.completions.create(
             model=os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
+            messages=synthesis_request["messages"],
             temperature=0.0,
-            max_tokens=max_tokens
+            max_tokens=synthesis_request["max_tokens"]
         )
-        
+
         answer = response.choices[0].message.content.strip()
         return answer
-        
+
     except Exception as e:
         logger.exception(f"LLM synthesis failed: {e}")
         return f"Based on the retrieved documents:\n\n{combined_context[:1500]}..."
@@ -951,9 +959,218 @@ def _detect_query_intent(query: str) -> Dict[str, Any]:
     
     return intent
 
+def _json_line(event: str, data: Dict[str, Any]) -> str:
+    return json.dumps({"event": event, **data}, default=str) + "\n"
+
 # ============================================================================
 # MAIN ASK ENDPOINT
 # ============================================================================
+@router.post("/ask/stream")
+def ask_stream(req: AskRequest, request: Request):
+    """Streaming RAG endpoint. Emits newline-delimited JSON events."""
+    start_time = time.time()
+    retrieval_time_ms = None
+    reranking_time_ms = None
+    synthesis_time_ms = None
+
+    query_logger = get_query_logger()
+
+    try:
+        logger.info(f"[ASK_STREAM] client={req.client_id}, question={req.question[:80]}...]")
+
+        enhanced_query = _enhance_query_for_forms(req.question)
+        if enhanced_query:
+            retrieval_query = enhanced_query
+            query_was_enhanced = True
+            logger.info(f"[ASK_STREAM] ✨ Query enhanced: '{retrieval_query}'")
+        else:
+            retrieval_query = req.question
+            query_was_enhanced = False
+
+        query_intent = _detect_query_intent(req.question)
+
+        entity_recognizer = get_entity_recognizer()
+        entities = entity_recognizer.extract_entities(req.question)
+        query_intent["entities"] = entities
+
+        if not query_was_enhanced and entity_recognizer.has_entities(entities):
+            if os.getenv("ENABLE_ENTITY_ENHANCEMENT", "true").lower() == "true":
+                entity_enhanced_query = _enhance_query_with_entities(retrieval_query, entities)
+                if entity_enhanced_query != retrieval_query:
+                    retrieval_query = entity_enhanced_query
+                    query_was_enhanced = True
+                    logger.info("[ASK_STREAM] 🏷️  Query enhanced with entities")
+
+        bundle = get_bundle(req.client_id, req.index_name)
+        retriever = bundle.get("retriever")
+
+        if retriever is None:
+            raise HTTPException(status_code=500, detail="Retriever not initialized")
+
+        retrieval_start = time.time()
+        initial_k = int(os.getenv("INITIAL_RETRIEVE_K", "12"))
+        retriever._similarity_top_k = initial_k
+        nodes = retriever.retrieve(retrieval_query)
+        retrieval_time_ms = int((time.time() - retrieval_start) * 1000)
+        logger.info(f"[ASK_STREAM] ✅ Retrieved {len(nodes)} chunks in {retrieval_time_ms}ms")
+
+        if not nodes:
+            no_results_answer = "I couldn't find any relevant information in the indexed documents."
+
+            def no_results_stream():
+                yield _json_line("token", {"text": no_results_answer})
+                yield _json_line("done", {
+                    "answer": no_results_answer,
+                    "references": [],
+                    "meta": {
+                        "client_id": req.client_id,
+                        "chunks_retrieved": 0,
+                        "query_enhanced": query_was_enhanced,
+                        "query_intent": query_intent
+                    }
+                })
+
+            return StreamingResponse(
+                no_results_stream(),
+                media_type="application/x-ndjson",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
+
+        reranking_start = time.time()
+        reranked_nodes = _apply_reranking(retrieval_query, nodes, use_reranker=True)
+        reranking_time_ms = int((time.time() - reranking_start) * 1000)
+
+        reranked_nodes = _reorder_chunks_by_intent(req.question, reranked_nodes, query_intent)
+
+        if query_intent.get("type") == "mcq":
+            final_k = int(os.getenv("MCQ_SYNTHESIS_K", "10"))
+        elif query_intent.get("type") == "summarization":
+            final_k = int(os.getenv("SUMMARIZATION_K", "10"))
+        elif query_intent.get("is_compound"):
+            final_k = int(os.getenv("COMPOUND_SYNTHESIS_K", "8"))
+        else:
+            final_k = int(os.getenv("FINAL_SYNTHESIS_K", "5"))
+
+        final_nodes = reranked_nodes[:final_k]
+        refs = _build_references(final_nodes, req.client_id)
+        refs_block = _refs_html(refs)
+        synthesis_request = _build_synthesis_request(req.question, final_nodes, query_intent)
+
+        def stream_answer():
+            answer_parts = []
+            synthesis_start = time.time()
+
+            try:
+                from openai import OpenAI
+
+                api_key = os.getenv("OPENAI_API_KEY")
+                if not api_key:
+                    logger.warning("OPENAI_API_KEY not set")
+                    fallback = f"Based on the retrieved documents:\n\n{synthesis_request['combined_context'][:1500]}..."
+                    answer_parts.append(fallback)
+                    yield _json_line("token", {"text": fallback})
+                else:
+                    client = OpenAI(api_key=api_key)
+                    stream = client.chat.completions.create(
+                        model=os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
+                        messages=synthesis_request["messages"],
+                        temperature=0.0,
+                        max_tokens=synthesis_request["max_tokens"],
+                        stream=True,
+                    )
+
+                    for chunk in stream:
+                        delta = chunk.choices[0].delta.content if chunk.choices else None
+                        if not delta:
+                            continue
+                        answer_parts.append(delta)
+                        yield _json_line("token", {"text": delta})
+
+                answer = "".join(answer_parts).strip()
+                nonlocal synthesis_time_ms
+                synthesis_time_ms = int((time.time() - synthesis_start) * 1000)
+                total_time_ms = int((time.time() - start_time) * 1000)
+
+                try:
+                    query_logger.log_query(
+                        client_id=req.client_id,
+                        user_org=req.client_id,
+                        index_name=req.index_name or req.client_id,
+                        conversation_id=req.conversation_id,
+                        original_query=req.question,
+                        enhanced_query=retrieval_query if query_was_enhanced else None,
+                        answer=answer,
+                        chunks_retrieved=len(nodes),
+                        chunks_used=len(final_nodes),
+                        retrieval_time_ms=retrieval_time_ms,
+                        reranking_time_ms=reranking_time_ms,
+                        synthesis_time_ms=synthesis_time_ms,
+                        total_time_ms=total_time_ms,
+                        query_intent=query_intent.get("type"),
+                        is_compound=query_intent.get("is_compound", False),
+                        is_followup=False,
+                        confidence_score=query_intent.get("confidence_score"),
+                        entities_detected=entity_recognizer.has_entities(entities),
+                        status="success"
+                    )
+                except Exception as log_error:
+                    logger.warning(f"[ASK_STREAM] Query logging failed: {log_error}")
+
+                if req.conversation_id:
+                    try:
+                        _db_insert_message(req.client_id, req.conversation_id, "user", req.question)
+                        _db_insert_message(req.client_id, req.conversation_id, "assistant", answer)
+                        if refs_block:
+                            _db_insert_message(req.client_id, req.conversation_id, "assistant", refs_block)
+                    except Exception as db_err:
+                        logger.error(f"[HISTORY][SQLite] ❌ Failed to persist stream response: {db_err}")
+
+                    try:
+                        history_key = f"{req.client_id}_{req.conversation_id}"
+                        CONVERSATION_HISTORY[history_key].append({"role": "user", "content": req.question})
+                        CONVERSATION_HISTORY[history_key].append({"role": "assistant", "content": answer})
+                        if refs_block:
+                            CONVERSATION_HISTORY[history_key].append({"role": "assistant", "content": refs_block})
+                    except Exception as hist_err:
+                        logger.warning(f"[HISTORY][Memory] ❌ Failed to store stream response: {hist_err}")
+
+                yield _json_line("done", {
+                    "answer": answer,
+                    "references": [r.model_dump() for r in refs],
+                    "meta": {
+                        "client_id": req.client_id,
+                        "chunks_retrieved": len(nodes),
+                        "chunks_used": len(final_nodes),
+                        "reranked": True,
+                        "query_enhanced": query_was_enhanced,
+                        "query_intent": query_intent,
+                        "performance": {
+                            "retrieval_ms": retrieval_time_ms,
+                            "reranking_ms": reranking_time_ms,
+                            "synthesis_ms": synthesis_time_ms,
+                            "total_ms": total_time_ms
+                        },
+                        **bundle.get("settings", {})
+                    }
+                })
+                logger.info(f"[ASK_STREAM] ✅ Request completed in {total_time_ms}ms")
+
+            except Exception as e:
+                logger.exception(f"[ASK_STREAM] Streaming synthesis failed: {e}")
+                yield _json_line("error", {"detail": "Streaming synthesis failed"})
+
+        return StreamingResponse(
+            stream_answer(),
+            media_type="application/x-ndjson",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"[ASK_STREAM] Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
 @router.post("/ask", response_model=AskResponse)
 def ask(req: AskRequest, request: Request):
     """Main RAG endpoint with section-awareness and document summarization."""

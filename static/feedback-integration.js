@@ -207,6 +207,8 @@ class FeedbackManager {
             if (this.processedElements.has(msg)) return;
             // Skip if already has feedback buttons
             if (msg.querySelector('.feedback-container')) return;
+            // Skip empty/loading/streaming placeholders
+            if (msg.dataset.emptyState || msg.dataset.feedbackReady === 'false') return;
             // Skip refs-only messages
             if (msg.classList.contains('refs')) return;
             // Skip if still showing typing indicator

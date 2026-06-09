@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (id === CONV_ID) {
       CONV_ID = newId();
       sessionStorage.setItem(`${STORAGE_PREFIX}CONV_ID`, CONV_ID);
-      messages.innerHTML = '';
+      showChatEmptyState();
       closeViewer();
     }
 
@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     CONV_ID = newId();
     sessionStorage.setItem(`${STORAGE_PREFIX}CONV_ID`, CONV_ID);
-    messages.innerHTML = '';
+    showChatEmptyState();
     closeViewer();
     await renderThreads();
   }
@@ -125,6 +125,142 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="answer-content">${md.makeHtml(answer)}</div>
       ${refsHTML}
     `;
+  }
+
+  function chatEmptyHTML() {
+    return `
+      <li class="chat-empty" data-empty-state="chat">
+        <div class="empty-state">
+          <div class="empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 48 48" focusable="false">
+              <path d="M12 14a8 8 0 0 1 8-8h12a8 8 0 0 1 8 8v8a8 8 0 0 1-8 8h-8l-10 8v-9.2A8 8 0 0 1 12 22z"></path>
+              <path d="M18 18h.01M24 18h.01M30 18h.01"></path>
+              <circle cx="18" cy="18" r="2"></circle>
+              <circle cx="24" cy="18" r="2"></circle>
+              <circle cx="30" cy="18" r="2"></circle>
+            </svg>
+          </div>
+          <h3>Ask a question to get started</h3>
+          <p>Start a conversation by asking anything about your SMS documents</p>
+        </div>
+      </li>
+    `;
+  }
+
+  function showChatEmptyState() {
+    messages.innerHTML = chatEmptyHTML();
+  }
+
+  function clearChatEmptyState() {
+    const empty = messages.querySelector('[data-empty-state="chat"]');
+    if (empty) empty.remove();
+  }
+
+  async function askJson(q, botLi) {
+    const res = await fetch(`${API_BASE}/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: q,
+        client_id: CLIENT_ID,
+        conversation_id: CONV_ID
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Request failed');
+    }
+
+    const data = await res.json();
+    botLi.innerHTML = buildAnswer(data);
+    botLi.dataset.feedbackReady = 'true';
+    return data;
+  }
+
+  async function askStream(q, botLi) {
+    const res = await fetch(`${API_BASE}/ask/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/x-ndjson'
+      },
+      body: JSON.stringify({
+        question: q,
+        client_id: CLIENT_ID,
+        conversation_id: CONV_ID
+      })
+    });
+
+    if (!res.ok || !res.body) {
+      return askJson(q, botLi);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let answerText = '';
+    let finalData = null;
+    let renderPending = false;
+    let streamDone = false;
+
+    function renderAnswer() {
+      renderPending = false;
+      if (streamDone) return;
+      botLi.innerHTML = `<div class="answer-content">${md.makeHtml(answerText || ' ')}</div>`;
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function scheduleRender() {
+      if (renderPending) return;
+      renderPending = true;
+      requestAnimationFrame(renderAnswer);
+    }
+
+    function handleEvent(evt) {
+      if (evt.event === 'token') {
+        answerText += evt.text || '';
+        scheduleRender();
+        return;
+      }
+
+      if (evt.event === 'done') {
+        finalData = evt;
+        streamDone = true;
+        answerText = evt.answer || answerText;
+        botLi.innerHTML = buildAnswer({
+          answer: answerText,
+          references: evt.references || []
+        });
+        botLi.dataset.feedbackReady = 'true';
+        messages.scrollTop = messages.scrollHeight;
+        return;
+      }
+
+      if (evt.event === 'error') {
+        throw new Error(evt.detail || 'Streaming failed');
+      }
+    }
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        handleEvent(JSON.parse(line));
+      }
+    }
+
+    if (buffer.trim()) {
+      handleEvent(JSON.parse(buffer));
+    }
+
+    return finalData || { answer: answerText, references: [] };
   }
 
   /* ─── HISTORY PANEL ────────────────────────────────────────────── */
@@ -207,7 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
   newBtn.addEventListener('click', async ()=>{
     CONV_ID = newId();
     sessionStorage.setItem(`${STORAGE_PREFIX}CONV_ID`, CONV_ID);
-    messages.innerHTML = '';
+    showChatEmptyState();
     await renderThreads();
     closeViewer();
   });
@@ -272,10 +408,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return `<li class="msg refs">${r.content.slice(6)}</li>`;
           }
           const cls  = r.role==='user' ? 'u' : 'ai';
+          const feedbackReady = r.role==='assistant' ? ' data-feedback-ready="true"' : '';
           const html = r.role==='assistant'
                        ? md.makeHtml(r.content)
                        : esc(r.content);
-          return `<li class="msg ${cls}">${html}</li>`;
+          return `<li class="msg ${cls}"${feedbackReady}>${html}</li>`;
         }).join('');
 
         messages.scrollTop = messages.scrollHeight;
@@ -295,13 +432,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log('✅ History loaded successfully');
       } else {
-        messages.innerHTML = '<li class="msg ai"><em>No messages in this conversation yet.</em></li>';
+        showChatEmptyState();
       }
       
     } catch (err) {
       console.error('❌ Failed to load history:', err.message);
       loadingLi.remove();
-      messages.innerHTML = '';
+      showChatEmptyState();
     }
   }
 
@@ -329,6 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sendBtn.disabled = true;
 
     setTitle(q);
+    clearChatEmptyState();
 
     const userLi = document.createElement('li');
     userLi.className = 'msg u';
@@ -337,30 +475,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const botLi = document.createElement('li');
     botLi.className = 'msg ai';
+    botLi.dataset.feedbackReady = 'false';
     botLi.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
     messages.append(botLi);
     messages.scrollTop = messages.scrollHeight;
 
     try {
-      const res = await fetch(`${API_BASE}/ask`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: q,
-          client_id: CLIENT_ID,
-          conversation_id: CONV_ID
-        })
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        botLi.innerHTML = `<div style="color:red">Error: ${err.detail}</div>`;
-        return;
-      }
-
-      const data = await res.json();
-      botLi.innerHTML = buildAnswer(data);
-      messages.scrollTop = messages.scrollHeight;
+      const data = await askStream(q, botLi);
 
       // Auto-open first reference
       if (data.references && data.references.length > 0) {
@@ -370,7 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
     } catch (err) {
-      botLi.innerHTML = `<div style="color:red">Network error: ${err.message}</div>`;
+      botLi.innerHTML = `<div style="color:red">Error: ${err.message}</div>`;
     } finally {
       sendBtn.disabled = false;
       input.focus();
@@ -393,6 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
     docTitle.textContent = title || 'Loading...';
     docTitle.className = 'doc-loading';
     
+    viewer.classList.add('has-document');
     viewer.classList.add('visible');
     viewer.classList.add('loading');
     
@@ -435,9 +557,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function closeViewer() {
     viewer.classList.remove('visible');
+    viewer.classList.remove('has-document');
     frame.src = '';
     currentDocUrl = null;
-    docTitle.textContent = 'Document viewer';
+    docTitle.textContent = 'Document Viewer (0)';
     docTitle.className = '';
   }
 
