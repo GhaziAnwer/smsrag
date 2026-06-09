@@ -1539,7 +1539,6 @@ async def list_conversations(request: Request):
         with _DB_LOCK:
             conn = _db_connect()
             try:
-                # Get ALL conversations regardless of ID format
                 cur = conn.execute(
                     """
                     SELECT
@@ -1568,10 +1567,7 @@ async def list_conversations(request: Request):
                         (client_id, conv_id),
                     )
                     title_row = title_cur.fetchone()
-                    if title_row:
-                        title = (title_row[0][:60] + "...") if len(title_row[0]) > 60 else title_row[0]
-                    else:
-                        title = "Untitled"
+                    title = (title_row[0][:60] + "...") if title_row and len(title_row[0]) > 60 else (title_row[0] if title_row else "Untitled")
 
                     conversations.append({
                         "conversation_id": conv_id,
@@ -1580,54 +1576,9 @@ async def list_conversations(request: Request):
                         "first_activity": row[2],
                         "last_activity": row[3],
                     })
-                
-                logger.info(f"[CONVERSATIONS] Returning {len(conversations)} conversations for {client_id}")
                 return conversations
             finally:
                 conn.close()
     except Exception as e:
         logger.error(f"[CONVERSATIONS] Error listing conversations: {e}")
         return []
-
-
-# ============================================================================
-# DELETE CONVERSATION ENDPOINT
-# ============================================================================
-@router.post("/conversations/{conversation_id}/delete")
-async def delete_conversation(request: Request, conversation_id: str):
-    """
-    Delete a conversation and all its messages from the database.
-    """
-    client_id = request.path_params.get("client_id")
-    if not client_id:
-        raise HTTPException(status_code=400, detail="client_id required")
-
-    try:
-        with _DB_LOCK:
-            conn = _db_connect()
-            try:
-                # Delete from database
-                cursor = conn.execute(
-                    "DELETE FROM chat_history WHERE client_id = ? AND conversation_id = ?",
-                    (client_id, conversation_id)
-                )
-                deleted_count = cursor.rowcount
-                conn.commit()
-                
-                # Also clear from in-memory
-                history_key = f"{client_id}_{conversation_id}"
-                if history_key in CONVERSATION_HISTORY:
-                    del CONVERSATION_HISTORY[history_key]
-                
-                logger.info(f"[DELETE] Deleted {deleted_count} messages for {client_id}:{conversation_id}")
-                
-                return {
-                    "success": True,
-                    "deleted_count": deleted_count,
-                    "conversation_id": conversation_id
-                }
-            finally:
-                conn.close()
-    except Exception as e:
-        logger.error(f"[DELETE] Failed to delete conversation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
