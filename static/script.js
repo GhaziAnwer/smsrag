@@ -293,10 +293,8 @@ document.addEventListener('DOMContentLoaded', () => {
       merged.set(c.conversation_id, c.title || 'Untitled');
     }
 
-    // Always include current conversation if not in server list
-    if (!merged.has(CONV_ID)) {
-      merged.set(CONV_ID, localStorage.getItem(`${STORAGE_PREFIX}${CONV_ID}_title`) || 'Untitled');
-    }
+    // Don't add current CONV_ID if it's not in the database
+    // This prevents showing "ghost" conversations that were never persisted
 
     threadNav.innerHTML = Array.from(merged.entries()).map(([id, t]) => `
         <div class="thread ${id===CONV_ID?'active':''}" data-id="${id}">
