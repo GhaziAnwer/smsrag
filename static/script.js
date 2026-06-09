@@ -39,10 +39,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* ─── UTILITIES ────────────────────────────────────────────────── */
   function newId () {
+    // Always use crypto.randomUUID for consistency with backend
     if (typeof globalThis.crypto?.randomUUID === 'function') {
       return 'c_' + globalThis.crypto.randomUUID();
     }
-    return 'c_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    // Fallback: generate UUID-like format with hyphens (not underscores)
+    const s4 = () => Math.random().toString(16).slice(2, 6);
+    return 'c_' + [s4()+s4(), s4(), s4(), s4(), s4()+s4()+s4()].join('-');
   }
 
   // Storage functions
@@ -69,6 +72,18 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem(`${STORAGE_PREFIX}THREADS`, JSON.stringify(filtered));
 
     localStorage.removeItem(`${STORAGE_PREFIX}${id}_title`);
+
+    // Delete from server - clear conversation history
+    try {
+      await fetch(`${API_BASE}/conversations/${id}/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: CLIENT_ID })
+      });
+      console.log('🗑️ Deleted conversation from server:', id);
+    } catch (err) {
+      console.warn('⚠️ Failed to delete from server:', err);
+    }
 
     if (id === CONV_ID) {
       CONV_ID = newId();
