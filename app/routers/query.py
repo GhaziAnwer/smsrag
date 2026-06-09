@@ -37,13 +37,6 @@ _DB_LOCK = threading.Lock()
 def _db_connect() -> sqlite3.Connection:
     # Ensure folder exists (no-op for project root files)
     os.makedirs(os.path.dirname(_DB_PATH) or ".", exist_ok=True)
-    
-    # Create database file if it doesn't exist
-    if not os.path.exists(_DB_PATH):
-        logger.warning(f"[HISTORY][SQLite] Database not found, creating: {_DB_PATH}")
-        # Touch the file
-        open(_DB_PATH, 'a').close()
-    
     conn = sqlite3.connect(_DB_PATH, check_same_thread=False)
     # Reasonable defaults for small chat persistence
     conn.execute("PRAGMA journal_mode=WAL;")
@@ -84,11 +77,7 @@ def _db_insert_message(client_id: str, conversation_id: str, role: str, content:
                     (client_id, conversation_id, role, content),
                 )
                 conn.commit()
-                logger.info(f"[HISTORY][SQLite] ✅ Inserted message: client_id={client_id}, conversation_id={conversation_id}, role={role}, id={cursor.lastrowid}")
-            except Exception as insert_err:
-                logger.error(f"[HISTORY][SQLite] ❌ Insert query failed: {insert_err}")
-                logger.error(f"[HISTORY][SQLite] DB path: {_DB_PATH}, exists: {os.path.exists(_DB_PATH)}")
-                raise
+                logger.info(f"[HISTORY][SQLite] ✅ Inserted message: client_id={client_id}, conversation_id={conversation_id}, role={role}")
             finally:
                 conn.close()
     except Exception as e:
@@ -122,12 +111,11 @@ def _db_fetch_history(client_id: Optional[str], conversation_id: str) -> List[Di
                         (conversation_id,),
                     )
                 rows = cur.fetchall()
-                logger.info(f"[HISTORY][SQLite] Fetched {len(rows)} messages for client_id={client_id}, conversation_id={conversation_id}")
                 return [{"role": r[0], "content": r[1]} for r in rows]
             finally:
                 conn.close()
     except Exception as e:
-        logger.error(f"[HISTORY][SQLite] Fetch failed: {e}")
+        logger.warning(f"[HISTORY][SQLite] Fetch failed: {e}")
         return []
 
 # Initialize DB at import
