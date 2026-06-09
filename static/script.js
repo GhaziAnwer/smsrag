@@ -64,12 +64,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   async function deleteThread(id) {
+    // Delete from database
+    try {
+      const res = await fetch(`${API_BASE}/conversation/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        console.log('✅ Deleted conversation from database:', id);
+      }
+    } catch (err) {
+      console.warn('Failed to delete from database:', err);
+    }
+
+    // Delete from localStorage
     const arr = JSON.parse(localStorage.getItem(`${STORAGE_PREFIX}THREADS`)||'[]');
     const filtered = arr.filter(tid => tid !== id);
     localStorage.setItem(`${STORAGE_PREFIX}THREADS`, JSON.stringify(filtered));
-
     localStorage.removeItem(`${STORAGE_PREFIX}${id}_title`);
 
+    // If deleting current conversation, create new one
     if (id === CONV_ID) {
       CONV_ID = newId();
       sessionStorage.setItem(`${STORAGE_PREFIX}CONV_ID`, CONV_ID);
@@ -272,23 +285,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (res.ok) serverConvs = await res.json();
     } catch(e) { console.warn('Could not fetch conversations:', e); }
 
-    // Merge: build map of id -> title (server takes priority)
+    // Build map from server conversations ONLY (server is source of truth)
     const merged = new Map();
 
-    // Add server conversations first (already sorted by last_activity desc)
+    // Add server conversations (already sorted by last_activity desc)
     for (const c of serverConvs) {
       merged.set(c.conversation_id, c.title || 'Untitled');
     }
 
-    // Add localStorage conversations that aren't already in the map
-    const localList = JSON.parse(localStorage.getItem(`${STORAGE_PREFIX}THREADS`)||'[]');
-    for (const id of localList) {
-      if (!merged.has(id)) {
-        merged.set(id, localStorage.getItem(`${STORAGE_PREFIX}${id}_title`) || 'Untitled');
-      }
-    }
-
-    // Always include current conversation
+    // Always include current conversation if not in server list
     if (!merged.has(CONV_ID)) {
       merged.set(CONV_ID, localStorage.getItem(`${STORAGE_PREFIX}${CONV_ID}_title`) || 'Untitled');
     }
@@ -371,6 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
     messages.innerHTML = '';
     
     console.log('🔄 Loading history for:', CONV_ID);
+    console.log('📡 API request:', `${API_BASE}/history?conversation_id=${CONV_ID}&client_id=${CLIENT_ID}`);
     
     // Show loading indicator
     const loadingLi = document.createElement('li');
@@ -382,9 +388,12 @@ document.addEventListener('DOMContentLoaded', () => {
       // Pass client_id to ensure proper isolation
       const res = await fetch(`${API_BASE}/history?conversation_id=${CONV_ID}&client_id=${CLIENT_ID}`);
       
+      console.log('📡 Response status:', res.status, res.statusText);
+      
       if(!res.ok) {
-        console.log('History endpoint not configured, status:', res.status);
+        console.log('History endpoint returned error, status:', res.status);
         loadingLi.remove();
+        showChatEmptyState();
         return;
       }
       
@@ -392,6 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!contentType || !contentType.includes("application/json")) {
         console.log('History endpoint not ready, content-type:', contentType);
         loadingLi.remove();
+        showChatEmptyState();
         return;
       }
       
@@ -432,6 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log('✅ History loaded successfully');
       } else {
+        console.log('⚠️ No messages in conversation');
         showChatEmptyState();
       }
       

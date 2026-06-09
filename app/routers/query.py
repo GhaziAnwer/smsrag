@@ -1582,3 +1582,43 @@ async def list_conversations(request: Request):
     except Exception as e:
         logger.error(f"[CONVERSATIONS] Error listing conversations: {e}")
         return []
+
+# ============================================================================
+# DELETE CONVERSATION ENDPOINT
+# ============================================================================
+@router.delete("/conversation/{conversation_id}")
+async def delete_conversation(request: Request, conversation_id: str):
+    """
+    Delete a conversation and all its messages from the database.
+    """
+    client_id = request.path_params.get("client_id")
+    if not client_id or not conversation_id:
+        raise HTTPException(status_code=400, detail="client_id and conversation_id required")
+
+    try:
+        with _DB_LOCK:
+            conn = _db_connect()
+            try:
+                cursor = conn.execute(
+                    "DELETE FROM chat_history WHERE client_id = ? AND conversation_id = ?;",
+                    (client_id, conversation_id),
+                )
+                deleted_count = cursor.rowcount
+                conn.commit()
+                
+                # Also remove from in-memory store
+                history_key = f"{client_id}_{conversation_id}"
+                if history_key in CONVERSATION_HISTORY:
+                    del CONVERSATION_HISTORY[history_key]
+                
+                logger.info(f"[DELETE] Deleted {deleted_count} messages for {client_id}:{conversation_id}")
+                
+                return {
+                    "status": "success",
+                    "deleted_messages": deleted_count
+                }
+            finally:
+                conn.close()
+    except Exception as e:
+        logger.error(f"[DELETE] Error deleting conversation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
