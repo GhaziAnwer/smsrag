@@ -1486,18 +1486,20 @@ async def get_history(request: Request, conversation_id: Optional[str] = None):
     try:
         logger.info(f"[HISTORY] Fetching history for client_id={client_id}, conversation_id={conversation_id}")
         
-        # Strategy 1: Try SQLite with client_id
+        # Strategy 1: Try exact match with client_id in database
         if client_id:
             db_rows = _db_fetch_history(client_id, conversation_id)
             if db_rows:
                 logger.info(f"[HISTORY][SQLite] Found {len(db_rows)} messages for {client_id}:{conversation_id}")
                 return db_rows
+            logger.info(f"[HISTORY][SQLite] No results for exact match: client_id={client_id}, conversation_id={conversation_id}")
         
-        # Strategy 2: Try SQLite without client_id filter
+        # Strategy 2: Try SQLite without client_id filter (fallback for older data)
         db_rows = _db_fetch_history(None, conversation_id)
         if db_rows:
-            logger.info(f"[HISTORY][SQLite] Found {len(db_rows)} messages for conversation_id={conversation_id}")
+            logger.info(f"[HISTORY][SQLite] Found {len(db_rows)} messages for conversation_id={conversation_id} (no client filter)")
             return db_rows
+        logger.info(f"[HISTORY][SQLite] No results without client filter: conversation_id={conversation_id}")
 
         # Strategy 3: Try in-memory with client prefix
         if client_id:
@@ -1506,19 +1508,45 @@ async def get_history(request: Request, conversation_id: Optional[str] = None):
             if history:
                 logger.info(f"[HISTORY][Memory] Found {len(history)} messages for key={history_key}")
                 return history
+            logger.info(f"[HISTORY][Memory] No results for key={history_key}")
         
         # Strategy 4: Try in-memory without client prefix
         history = CONVERSATION_HISTORY.get(conversation_id, [])
         if history:
             logger.info(f"[HISTORY][Memory] Found {len(history)} messages for key={conversation_id}")
             return history
+        logger.info(f"[HISTORY][Memory] No results for key={conversation_id}")
         
-        # No history found anywhere
-        logger.info(f"[HISTORY] No history found for conversation_id={conversation_id}")
+        # Strategy 5: Debug - check what's actually in the database
+        logger.warning(f"[HISTORY] No history found anywhere. Checking database contents...")
+        with _DB_LOCK:
+            conn = _db_connect()
+            try:
+                # Check all conversations for this client
+                if client_id:
+                    cursor = conn.execute(
+                        "SELECT DISTINCT conversation_id FROM chat_history WHERE client_id = ? LIMIT 10",
+                        (client_id,)
+                    )
+                    conv_ids = [row[0] for row in cursor.fetchall()]
+                    logger.warning(f"[HISTORY] Available conversation_ids for client {client_id}: {conv_ids}")
+                
+                # Check if conversation exists without client filter
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM chat_history WHERE conversation_id = ?",
+                    (conversation_id,)
+                )
+                count = cursor.fetchone()[0]
+                logger.warning(f"[HISTORY] Messages with conversation_id={conversation_id} (any client): {count}")
+            finally:
+                conn.close()
+        
         return []
         
     except Exception as e:
         logger.error(f"[HISTORY] Error fetching history: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return []
 
 
