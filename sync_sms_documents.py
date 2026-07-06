@@ -32,6 +32,12 @@ DEFAULT_CLIENTS = ("rsms", "oceangold", "supereco", "primenova", "prime")
 DEFAULT_BRANCH = "SMS-Documents-ERP"
 DEFAULT_PROJECT_PATH = "SMS-REPO/live-sms-documents.git"
 
+# GitLab folder name → production client name mapping
+# Use when GitLab repo folder name differs from production client name
+GITLAB_FOLDER_MAP = {
+    "andriaki": "andriki",  # GitLab uses 'andriki', production uses 'andriaki'
+}
+
 log = logging.getLogger("sms_document_sync")
 _INDEXING_IMPORTS_READY = False
 
@@ -668,7 +674,8 @@ def process_clients(args: argparse.Namespace) -> list[ClientResult]:
         result = ClientResult(client=client)
         results.append(result)
         try:
-            source_docs_dir = args.repo_dir / client / "documents"
+            gitlab_folder = GITLAB_FOLDER_MAP.get(client, client)
+            source_docs_dir = args.repo_dir / gitlab_folder / "documents"
             client_root = args.data_dir / client
             target_docs_dir = client_root / "documents"
 
