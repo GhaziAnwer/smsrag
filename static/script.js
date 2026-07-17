@@ -356,6 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!btn) return;
     input.value = btn.textContent.trim();
     autoGrow();
+    updateSendVisibility();
     input.focus();
   });
 
@@ -470,7 +471,11 @@ document.addEventListener('DOMContentLoaded', () => {
     input.style.height='56px';
     if(input.scrollHeight>56) input.style.height=input.scrollHeight+'px';
   }
-  input.addEventListener('input',autoGrow);
+  // Show the send button only when there's text to send (like Claude).
+  function updateSendVisibility(){
+    sendBtn.classList.toggle('visible', input.value.trim().length > 0);
+  }
+  input.addEventListener('input',()=>{ autoGrow(); updateSendVisibility(); });
   input.addEventListener('keydown',e=>{
     if(e.key==='Enter' && !e.shiftKey){
       e.preventDefault();
@@ -488,6 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     input.value = '';
     input.style.height = '56px';
+    updateSendVisibility();
     sendBtn.disabled = true;
 
     setTitle(q);
@@ -740,5 +746,6 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ─── INIT ──────────────────────────────────────────────────────── */
   loadHistory();
   renderThreads();
+  updateSendVisibility();
   input.focus();
 });

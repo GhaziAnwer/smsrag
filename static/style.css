@@ -243,14 +243,19 @@ body{display:flex;flex-direction:column}
 }
 #chat-input:focus{outline:none}
 #chat-input::placeholder{color:var(--muted)}
+/* Hidden until the user types (like Claude); the up-arrow button then fades in.
+   Stays in layout so the composer height doesn't jump. */
 #send-btn{
   align-self:flex-end;
   width:40px;height:40px;flex:none;border:none;border-radius:12px;background:var(--accent);
-  color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;
-  cursor:pointer;transition:.15s
+  color:#fff;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  opacity:0;transform:scale(.85);pointer-events:none;
+  transition:opacity .15s,transform .15s,background .15s;
 }
+#send-btn.visible{opacity:1;transform:scale(1);pointer-events:auto;}
 #send-btn:hover{background:var(--accent-2)}
-#send-btn:disabled{opacity:.45;cursor:not-allowed}
+#send-btn svg{flex:none}
 
 /* ─── TYPING INDICATOR ──────────────────────────────────────────── */
 .typing{display:inline-block}
