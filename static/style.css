@@ -158,6 +158,10 @@ body{display:flex;flex-direction:column}
   padding:0;
   gap:8px;
 }
+
+/* "Was this helpful?" is redundant — the thumb buttons carry their own
+   Helpful / Not helpful tooltips. */
+.msg.ai .feedback-label{ display:none; }
 .copy-btn{
   display:inline-flex;align-items:center;justify-content:center;
   background:transparent;border:1px solid var(--border);border-radius:8px;
