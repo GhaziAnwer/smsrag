@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+venv/
+.vscode/
+.idea/
+*.log
+data/
+.git/
+.env
+
+# Database files (mounted as volumes in production)
+chat_history.db
+feedback.db
+query_logs.db
+*.db
+
+# Nginx config (deployed separately on host)
+nginx.conf

@@ -1,0 +1,74 @@
+# ============================================
+# MINIMAL REQUIREMENTS FOR DOCKER DEPLOYMENT
+# ============================================
+# Use this for faster builds and smaller images
+
+# Web Framework
+fastapi==0.110.3
+uvicorn[standard]==0.34.0
+starlette==0.37.2
+python-multipart
+
+# RAG Framework - LlamaIndex
+llama-index==0.12.11
+llama-index-core==0.12.11
+llama-index-embeddings-openai==0.3.1
+llama-index-llms-openai==0.3.12
+llama-index-vector-stores-chroma==0.4.2
+llama-index-readers-file==0.4.2
+llama-parse==0.5.19
+llama-cloud==0.1.7
+loguru==0.7.3
+
+# OpenAI
+openai==1.59.3
+
+# Vector Database
+chromadb==0.6.1
+chroma-hnswlib==0.7.6
+
+# Database
+SQLAlchemy==2.0.36
+
+# Document Processing
+pypdf==5.1.0
+pdfplumber==0.11.6
+beautifulsoup4==4.12.3
+python-docx
+openpyxl==3.1.5
+
+# HTTP & Networking
+httpx==0.28.1
+requests==2.32.3
+aiohttp==3.11.11
+
+# Utilities
+python-dotenv==1.0.1
+pydantic==2.10.4
+pydantic-settings==2.7.1
+numpy==1.26.4
+pandas==2.2.2
+tqdm==4.67.1
+tenacity==8.5.0
+
+# Text Processing
+tiktoken==0.8.0
+nltk==3.9.1
+
+# Optional: If you use BM25 retrieval
+llama-index-retrievers-bm25==0.5.2
+rank-bm25==0.2.2
+bm25s==0.2.13
+
+# Optional: If you use LangChain
+langchain==0.3.14
+langchain-openai==0.3.0
+langchain-community==0.3.14
+langchain-core==0.3.29
+
+# NOT INCLUDED (Remove if you don't need):
+# - torch (2GB+ size)
+# - transformers
+# - sentence-transformers
+# - pywin32 (Windows only)
+# - pyreadline3 (Windows only)loguru==0.7.3

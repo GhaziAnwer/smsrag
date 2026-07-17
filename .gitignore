@@ -1,0 +1,33 @@
+# Credentials
+.env
+*.env
+*.pem
+*.key
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# ChromaDB and index data
+chroma/
+index_store/
+data/
+*.jsonl
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups
+*.bak
+script.js.bak*
