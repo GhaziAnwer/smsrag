@@ -432,6 +432,31 @@ document.addEventListener('DOMContentLoaded', () => {
     return url;
   }
 
+  // These docs are Word→HTML exports with a fixed ~780px body width and wide
+  // tables, so a narrow panel (e.g. the SAILERP popup embed) gets a page-level
+  // horizontal scrollbar. Inject a small responsive sheet so the document fits
+  // the panel and wide tables scroll inside their own box instead. Same-origin
+  // only; the Google Docs Viewer (DOCX/PDF) is cross-origin and will throw —
+  // caught and ignored.
+  function injectFitCss(frameEl) {
+    try {
+      const doc = frameEl.contentDocument;
+      if (!doc || !doc.head || doc.getElementById('sms-fit-css')) return;
+      const style = doc.createElement('style');
+      style.id = 'sms-fit-css';
+      style.textContent = `
+        html { overflow-x: hidden; }
+        body { max-width: 100% !important; }
+        img, svg, video { max-width: 100% !important; height: auto; }
+        table { max-width: 100%; display: block; overflow-x: auto; }
+        pre { max-width: 100%; overflow-x: auto; }
+      `;
+      doc.head.appendChild(style);
+    } catch (e) {
+      /* cross-origin (Google Docs Viewer) — nothing to inject */
+    }
+  }
+
   let currentDocUrl = null;
 
   function openDoc(url, title) {
@@ -464,7 +489,8 @@ document.addEventListener('DOMContentLoaded', () => {
       viewer.classList.remove('loading');
       docTitle.textContent = title || 'Document';
       docTitle.className = 'doc-loaded';
-      
+      injectFitCss(frame);
+
       frame.removeEventListener('load', handleLoad);
       frame.removeEventListener('error', handleError);
     };
