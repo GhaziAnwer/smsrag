@@ -13,16 +13,12 @@
 
 <!-- ── NAV BAR ─────────────────────────────────────────────── -->
 <header class="nav glass">
-  <div class="brand"><span class="logo">⚓</span> Safe Lanes</div>
-
   <div class="nav-actions" id="navActions">
     <button id="history-btn" class="action" title="Chat History"><i class="i-history"></i><span>History</span></button>
     <button id="new-chat" class="action" title="New Chat"><i class="i-plus"></i><span>New</span></button>
     <!-- badge injected by script.js -->
   </div>
 </header>
-
-<p class="notice">AI answers can be inaccurate – always verify.</p>
 
 <!-- ── WORKSPACE (chat | viewer) ───────────────────────────── -->
 <main class="workspace">
@@ -33,6 +29,18 @@
 
     <ul id="messages" class="messages"></ul>
 
+    <div id="welcome-screen" class="welcome-screen">
+      <div class="welcome-content">
+        <h2 class="welcome-title">Chat to SMS Docs</h2>
+        <p class="welcome-subtitle">Ask anything about your Safety Management System</p>
+        <div class="welcome-suggestions">
+          <button type="button" class="suggestion-btn">What are the emergency procedures for fire on board?</button>
+          <button type="button" class="suggestion-btn">What is the enclosed space entry procedure?</button>
+          <button type="button" class="suggestion-btn">Who is responsible for safety drills?</button>
+        </div>
+      </div>
+    </div>
+
     <form id="chat-form" class="composer glass">
       <textarea id="chat-input" placeholder="Ask anything …" rows="1" spellcheck="true"></textarea>
       <button id="send-btn" title="Send"><i class="i-send"></i></button>
@@ -41,6 +49,9 @@
 
   <!-- VIEWER -->
   <aside id="doc-viewer" class="viewer">
+    <!-- Direct child of .viewer (not .viewer-head) so it is not clipped
+         and stays reachable when the panel is collapsed to zero width. -->
+    <button id="viewer-toggle" class="viewer-toggle-btn" title="Toggle document panel">‹</button>
     <header class="viewer-head">
       <span id="doc-title">Document viewer</span>
       <button id="viewer-close" title="Close">✕</button>

@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const threadNav  = document.getElementById('thread-list');
   
   const messages   = document.getElementById('messages');
+  const chatPanel  = document.querySelector('.chat');
   const form       = document.getElementById('chat-form');
   const input      = document.getElementById('chat-input');
   const sendBtn    = document.getElementById('send-btn');
@@ -37,12 +38,32 @@ document.addEventListener('DOMContentLoaded', () => {
   badge.textContent = 'Client: ' + window.CLIENT_LABEL;
   navActions.append(badge);
 
+  const welcomeScreen = document.getElementById('welcome-screen');
+  const viewerToggle  = document.getElementById('viewer-toggle');
+
+  // Set when the user collapses the viewer by hand, so a later answer
+  // does not yank the panel back open against their wishes.
+  let userCollapsedViewer = false;
+
   /* ─── UTILITIES ────────────────────────────────────────────────── */
   function newId () {
     if (typeof globalThis.crypto?.randomUUID === 'function') {
       return 'c_' + globalThis.crypto.randomUUID();
     }
     return 'c_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+  }
+
+  /* ─── WELCOME SCREEN ───────────────────────────────────────────── */
+  // .chat-empty on the chat panel collapses #messages and hides the
+  // duplicate page title, so the welcome block centres in the full panel.
+  function showWelcomeScreen () {
+    if (welcomeScreen) welcomeScreen.classList.remove('hidden');
+    chatPanel?.classList.add('chat-empty');
+  }
+
+  function hideWelcomeScreen () {
+    if (welcomeScreen) welcomeScreen.classList.add('hidden');
+    chatPanel?.classList.remove('chat-empty');
   }
 
   // Storage functions
@@ -79,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
       CONV_ID = newId();
       sessionStorage.setItem(`${STORAGE_PREFIX}CONV_ID`, CONV_ID);
       messages.innerHTML = '';
+      showWelcomeScreen();
       closeViewer();
     }
 
@@ -213,8 +235,18 @@ document.addEventListener('DOMContentLoaded', () => {
     CONV_ID = newId();
     sessionStorage.setItem(`${STORAGE_PREFIX}CONV_ID`, CONV_ID);
     messages.innerHTML = '';
+    showWelcomeScreen();
     await renderThreads();
     closeViewer();
+  });
+
+  // Suggestion chips on the welcome screen fill the composer.
+  welcomeScreen?.addEventListener('click', e => {
+    const btn = e.target.closest('.suggestion-btn');
+    if (!btn) return;
+    input.value = btn.textContent.trim();
+    autoGrow();
+    input.focus();
   });
 
   // Markdown converter
@@ -254,13 +286,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if(!res.ok) {
         console.log('History endpoint not configured, status:', res.status);
         loadingLi.remove();
+        showWelcomeScreen();
         return;
       }
-      
+
       const contentType = res.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         console.log('History endpoint not ready, content-type:', contentType);
         loadingLi.remove();
+        showWelcomeScreen();
         return;
       }
       
@@ -272,6 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Only populate if we have data
       if (rows && rows.length > 0) {
+        hideWelcomeScreen();
         messages.innerHTML = rows.map(r=>{
           if (r.role==='assistant' && r.content.startsWith('[REFS]')){
             return `<li class="msg refs">${r.content.slice(6)}</li>`;
@@ -286,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         messages.scrollTop = messages.scrollHeight;
         // ▶️ Auto-open the first reference (if present in history)
         const firstRef = messages.querySelector('.refs-list .ref-link');
-        if (firstRef) {
+        if (firstRef && !userCollapsedViewer) {
           const url = firstRef.dataset.url;
           const title = firstRef.dataset.title;
           if (url) {
@@ -300,13 +335,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log('✅ History loaded successfully');
       } else {
-        messages.innerHTML = '<li class="msg ai"><em>No messages in this conversation yet.</em></li>';
+        messages.innerHTML = '';
+        showWelcomeScreen();
       }
-      
+
     } catch (err) {
       console.error('❌ Failed to load history:', err.message);
       loadingLi.remove();
       messages.innerHTML = '';
+      showWelcomeScreen();
     }
   }
 
@@ -328,6 +365,8 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const q = input.value.trim();
     if (!q) return;
+
+    hideWelcomeScreen();
 
     input.value = '';
     input.style.height = '46px';
@@ -367,8 +406,9 @@ document.addEventListener('DOMContentLoaded', () => {
       botLi.innerHTML = buildAnswer(data);
       messages.scrollTop = messages.scrollHeight;
 
-      // Auto-open first reference
-      if (data.references && data.references.length > 0) {
+      // Auto-open first reference, unless the user deliberately collapsed
+      // the panel — in that case respect their choice.
+      if (!userCollapsedViewer && data.references && data.references.length > 0) {
         setTimeout(() => {
           openDoc(data.references[0].url, data.references[0].title);
         }, 300);
@@ -406,8 +446,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     docTitle.textContent = title || 'Loading...';
     docTitle.className = 'doc-loading';
-    
-    viewer.classList.add('visible');
+
+    viewer.classList.add('open');
+    viewer.classList.remove('collapsed');
+    userCollapsedViewer = false;
+    if (viewerToggle) viewerToggle.textContent = '‹';
     viewer.classList.add('loading');
     
     const fullUrl = url.startsWith('http') ? url : `${DOC_BASE}${url}`;
@@ -448,14 +491,34 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function closeViewer() {
-    viewer.classList.remove('visible');
+    viewer.classList.remove('open');
+    viewer.classList.remove('collapsed');
+    if (viewerToggle) viewerToggle.textContent = '‹';
     frame.src = '';
+    // Must reset: openDoc() early-returns when currentDocUrl === url, so
+    // leaving it set makes re-clicking the same reference a no-op.
     currentDocUrl = null;
     docTitle.textContent = 'Document viewer';
     docTitle.className = '';
   }
 
   vClose.addEventListener('click', closeViewer);
+
+  // Collapse/expand without tearing down the loaded document, so re-opening
+  // is instant. Distinct from closeViewer(), which fully discards it.
+  if (viewerToggle) {
+    viewerToggle.addEventListener('click', () => {
+      if (viewer.classList.contains('collapsed')) {
+        viewer.classList.remove('collapsed');
+        viewerToggle.textContent = '‹';
+        userCollapsedViewer = false;
+      } else {
+        viewer.classList.add('collapsed');
+        viewerToggle.textContent = '›';
+        userCollapsedViewer = true;
+      }
+    });
+  }
 
   // Handle reference link clicks
   messages.addEventListener('click', e => {

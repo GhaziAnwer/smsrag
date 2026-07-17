@@ -31,9 +31,13 @@ body{display:flex;flex-direction:column}
   height:56px;display:flex;align-items:center;justify-content:space-between;
   padding:0 20px;background:#fff;border-bottom:1px solid #dde3f4;
 }
+/* Removed with the branding block (Change A) — kept for reference
 .brand{font-size:18px;font-weight:600;display:flex;align-items:center;gap:6px}
 .logo{font-size:17px}
-.nav-actions{display:flex;align-items:center;gap:14px}
+*/
+/* margin-left:auto keeps History/New/badge right-aligned now that .brand
+   is gone and the header has only this one child. */
+.nav-actions{display:flex;align-items:center;gap:14px;margin-left:auto}
 .nav-actions>*{flex:0 0 auto}
 
 .client-badge{
@@ -49,18 +53,21 @@ body{display:flex;flex-direction:column}
 .action:hover{background:var(--accent-2);transform:translateY(-1px)}
 .action i{font-style:normal}
 
+/* Removed with the notice bar (Change A) — kept for reference
 .notice{
   text-align:center;font-size:12px;padding:4px 8px;background:#fff3f4;color:#c13248;
   border-bottom:1px solid #e4b8c2
 }
+*/
 
 /* ─── WORKSPACE ─────────────────────────────────────────────────── */
 .workspace{flex:1;display:flex;min-height:0}
+/* flex:1 (was flex:0 0 40%) so the chat reclaims the full width when the
+   viewer is collapsed, and yields to it when a document opens. */
 .chat{
-  flex:0 0 40%;min-width:260px;display:flex;flex-direction:column;
+  flex:1;min-width:260px;display:flex;flex-direction:column;
   padding:14px;gap:10px;background:#fff;border-right:1px solid #e4e9f6
 }
-.viewer{flex:1;display:flex;flex-direction:column;background:#fafcff;position:relative}
 
 .page-title{font-size:18px;font-weight:600;text-align:left;opacity:.8}
 
@@ -169,14 +176,69 @@ body{display:flex;flex-direction:column}
 .typing span:nth-child(3){animation-delay:.4s}
 
 /* ─── VIEWER ────────────────────────────────────────────────────── */
+/* Hidden by default, slides in when a document opens.
+   display:flex/column is required — .viewer iframe uses flex:1 1 0% to fill
+   the remaining height, which collapses if this is not a flex container.
+   overflow stays visible so the toggle handle can sit outside the left edge;
+   .viewer-head clips its own text instead (see below). */
 .viewer{
-  min-height:0;overflow:hidden;background:#fbfcff;
+  flex:0 0 0;
+  min-width:0;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  overflow:visible;
+  background:#fbfcff;
   box-shadow:inset 0 0 0 1px #e2e6f4;
+  position:relative;
+  transition:flex-basis .35s cubic-bezier(.4,0,.2,1),
+             min-width  .35s cubic-bezier(.4,0,.2,1);
 }
+
+.viewer.open{
+  flex:0 0 58%;
+  min-width:320px;
+}
+
+/* User-collapsed: same zero width as closed, but the handle stays visible. */
+.viewer.open.collapsed{
+  flex:0 0 0;
+  min-width:0;
+}
+
+/* Viewer toggle handle — floats over the chat panel's right edge so it is
+   reachable whether the panel is expanded or collapsed to zero. */
+.viewer-toggle-btn{
+  position:absolute;
+  left:-18px;
+  top:50%;
+  transform:translateY(-50%);
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  background:var(--accent);
+  color:#fff;
+  border:none;
+  cursor:pointer;
+  font-size:20px;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 2px 10px rgba(0,0,0,.2);
+  z-index:20;
+  transition:background .2s;
+  line-height:1;
+  padding:0;
+}
+
+.viewer-toggle-btn:hover{background:var(--accent-2)}
+
+.viewer.open .viewer-toggle-btn{display:flex}
 
 .viewer-head{
   height:46px;display:flex;justify-content:space-between;align-items:center;
   padding:0 14px;font-size:13px;font-weight:600;border-bottom:1px solid #dde3f4;
+  overflow:hidden;white-space:nowrap;
 }
 
 .viewer-head button{background:none;border:none;font-size:18px;cursor:pointer;opacity:.5;transition:.2s}
@@ -264,8 +326,10 @@ body{display:flex;flex-direction:column}
 @media(max-width:900px){
   .chat{flex:1}
   .viewer{display:none}
-  
-  .viewer.visible{
+
+  /* .visible -> .open: the state class was renamed in Change C. Without
+     this the panel could never appear on mobile. */
+  .viewer.open{
     display:flex;
     position:fixed;
     top:56px;
@@ -274,6 +338,9 @@ body{display:flex;flex-direction:column}
     bottom:0;
     z-index:1000;
   }
+
+  /* Full-screen overlay on mobile, so collapsing means hiding outright. */
+  .viewer.open.collapsed{display:none}
 }
 
 /* ─── ICONS ─────────────────────────────────────────────────────── */
@@ -297,4 +364,75 @@ button:focus {
 /* MCQ option line-break guarantee */
 .answer-content p {
   white-space: pre-line;
+}
+
+/* ── Welcome screen ─────────────────────────────────────── */
+.welcome-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 40px 24px;
+  text-align: center;
+  animation: fadeIn 0.3s ease;
+}
+
+.welcome-screen.hidden {
+  display: none;
+}
+
+/* While the welcome screen is up, #messages is empty but would still
+   claim flex:1 and push the welcome block off-centre, and .page-title
+   would duplicate the welcome heading. Collapse both. */
+.chat.chat-empty .messages {
+  flex: 0 0 auto;
+}
+
+.chat.chat-empty .page-title {
+  display: none;
+}
+
+.welcome-content {
+  max-width: 520px;
+  width: 100%;
+}
+
+.welcome-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--fg);
+  margin: 0 0 8px 0;
+  letter-spacing: -0.3px;
+}
+
+.welcome-subtitle {
+  font-size: 15px;
+  color: #888;
+  margin: 0 0 36px 0;
+}
+
+.welcome-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.suggestion-btn {
+  background: #f5f5f7;
+  border: 1px solid #e5e5ea;
+  border-radius: 12px;
+  padding: 13px 18px;
+  font-size: 14px;
+  color: #1a1a2e;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+  line-height: 1.4;
+  font-family: inherit;
+}
+
+.suggestion-btn:hover {
+  background: #ebebf0;
+  border-color: #d0d0d8;
 }
