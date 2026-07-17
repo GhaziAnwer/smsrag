@@ -141,8 +141,22 @@ body{display:flex;flex-direction:column}
 }
 
 /* ─── ANSWER ACTIONS (copy) ─────────────────────────────────────── */
+/* inline-flex so the copy button and the feedback widget (appended later by
+   feedback-integration.js) sit on the same line at the end of an answer. */
 .answer-actions{
-  margin-top:10px;display:flex;gap:8px;
+  margin-top:12px;display:inline-flex;gap:8px;vertical-align:middle;
+}
+
+/* Pull the feedback widget onto the copy button's line: drop its top border
+   and top margin, and make it inline. Higher specificity than the widget's
+   own injected .feedback-container rule, so no !important needed. */
+.msg.ai .feedback-container{
+  display:inline-flex;
+  vertical-align:middle;
+  border-top:none;
+  margin:12px 0 0 10px;
+  padding:0;
+  gap:8px;
 }
 .copy-btn{
   display:inline-flex;align-items:center;justify-content:center;
