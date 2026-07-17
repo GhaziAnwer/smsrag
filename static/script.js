@@ -553,9 +553,19 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!doc || !doc.head || doc.getElementById('sms-fit-css')) return;
       const style = doc.createElement('style');
       style.id = 'sms-fit-css';
+      // Word→HTML exports render list numbers with a negative indent that
+      // pokes past the page's left edge (~ -11px), so they get clipped by the
+      // narrow panel. Normalise the body with a left gutter (and border-box so
+      // padding does not re-introduce a right-side scrollbar), and let wide
+      // tables scroll inside their own box.
       style.textContent = `
         html { overflow-x: hidden; }
-        body { max-width: 100% !important; }
+        body {
+          box-sizing: border-box !important;
+          max-width: 100% !important;
+          margin: 0 !important;
+          padding: 20px 20px 24px 40px !important;
+        }
         img, svg, video { max-width: 100% !important; height: auto; }
         table { max-width: 100%; display: block; overflow-x: auto; }
         pre { max-width: 100%; overflow-x: auto; }
