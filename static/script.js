@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const welcomeScreen = document.getElementById('welcome-screen');
   const viewerToggle  = document.getElementById('viewer-toggle');
+  const pageTitle     = document.getElementById('page-title');
 
   // Set when the user hides the viewer by hand, so a later answer does not
   // yank the panel back open against their wishes.
@@ -62,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function showWelcomeScreen () {
     if (welcomeScreen) welcomeScreen.classList.remove('hidden');
     chatPanel?.classList.add('chat-empty');
+    clearPanelTitle();
     const titleEl = welcomeScreen?.querySelector('.welcome-title');
     if (titleEl) {
       const h = new Date().getHours();
@@ -75,6 +77,11 @@ document.addEventListener('DOMContentLoaded', () => {
     chatPanel?.classList.remove('chat-empty');
   }
 
+  // Clear the panel header name when returning to the empty/landing state.
+  function clearPanelTitle () {
+    if (pageTitle) pageTitle.textContent = '';
+  }
+
   // Storage functions
   function saveThread(id){
     const arr = JSON.parse(localStorage.getItem(`${STORAGE_PREFIX}THREADS`)||'[]');
@@ -84,13 +91,68 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   
-  function setTitle(line){
+  // Words dropped when deriving a chat name from a question — interrogatives,
+  // auxiliaries, articles/prepositions, and generic filler that carries no topic.
+  const NAME_STOPWORDS = new Set([
+    'what','whats','how','who','whom','when','where','why','which','whose',
+    'is','are','am','be','was','were','been','the','a','an','of','for','to',
+    'in','on','at','by','with','from','as','and','or','do','does','did','can',
+    'could','should','would','will','shall','may','might','must','i','we','you',
+    'my','our','your','me','us','it','its','this','that','these','those','if',
+    'please','tell','explain','describe','list','give','show','about','regarding',
+    'concerning','related','onboard','board','ship','vessel',
+    'procedure','procedures','process','processes','requirement','requirements'
+  ]);
+
+  // Derive a short, topic-based chat name from a question (not the raw text).
+  function generateChatName(question){
+    const words = (question || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w && !NAME_STOPWORDS.has(w));
+    let picked = words.slice(0, 4);
+    if (!picked.length) {
+      // Nothing meaningful survived — fall back to the first words verbatim.
+      picked = (question || 'Chat').replace(/[^a-z0-9\s]/gi, ' ')
+        .split(/\s+/).filter(Boolean).slice(0, 4);
+    }
+    const name = picked
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')
+      .slice(0, 34)
+      .trim();
+    return name || 'Chat';
+  }
+
+  // If a chat name already exists on another conversation, append the next
+  // number: "Fire Safety" -> "Fire Safety2" -> "Fire Safety3".
+  function dedupeChatName(base){
+    const ids = JSON.parse(localStorage.getItem(`${STORAGE_PREFIX}THREADS`)||'[]');
+    const used = new Set(
+      ids.filter(id => id !== CONV_ID)
+         .map(id => localStorage.getItem(`${STORAGE_PREFIX}${id}_title`))
+         .filter(Boolean)
+    );
+    if (!used.has(base)) return base;
+    let n = 2;
+    while (used.has(base + n)) n++;
+    return base + n;
+  }
+
+  // Show the current conversation's name in the chat panel header.
+  function updatePanelTitle(name){
+    if (pageTitle) pageTitle.textContent = name || '';
+  }
+
+  function setTitle(question){
     const key = `${STORAGE_PREFIX}${CONV_ID}_title`;
     const cur = localStorage.getItem(key)||'';
-    if(!cur || cur === 'Untitled'){ 
-      localStorage.setItem(key, line.slice(0,30)); 
-      saveThread(CONV_ID); 
-    }
+    if(cur && cur !== 'Untitled'){ updatePanelTitle(cur); return; }
+    const name = dedupeChatName(generateChatName(question));
+    localStorage.setItem(key, name);
+    saveThread(CONV_ID);
+    updatePanelTitle(name);
   }
   
   async function deleteThread(id) {
@@ -172,7 +234,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (res.ok) serverConvs = await res.json();
     } catch(e) { console.warn('Could not fetch conversations:', e); }
 
-    // Merge: build map of id -> title (server takes priority)
+    // Merge: build map of id -> title. Server supplies the id list/order, but a
+    // locally-generated (intent-based) title takes precedence over the server's
+    // raw-first-message title so the history panel shows the nice names.
     const merged = new Map();
 
     // Add server conversations first (already sorted by last_activity desc)
@@ -180,12 +244,12 @@ document.addEventListener('DOMContentLoaded', () => {
       merged.set(c.conversation_id, c.title || 'Untitled');
     }
 
-    // Add localStorage conversations that aren't already in the map
+    // Overlay localStorage titles (generated names win).
     const localList = JSON.parse(localStorage.getItem(`${STORAGE_PREFIX}THREADS`)||'[]');
     for (const id of localList) {
-      if (!merged.has(id)) {
-        merged.set(id, localStorage.getItem(`${STORAGE_PREFIX}${id}_title`) || 'Untitled');
-      }
+      const local = localStorage.getItem(`${STORAGE_PREFIX}${id}_title`);
+      if (local) merged.set(id, local);
+      else if (!merged.has(id)) merged.set(id, 'Untitled');
     }
 
     // Always include current conversation
@@ -316,6 +380,15 @@ document.addEventListener('DOMContentLoaded', () => {
       // Only populate if we have data
       if (rows && rows.length > 0) {
         hideWelcomeScreen();
+        // Show this conversation's name in the panel header. Fall back to a
+        // generated name from the first user message for older conversations
+        // that never stored one.
+        let storedName = localStorage.getItem(`${STORAGE_PREFIX}${CONV_ID}_title`);
+        if (!storedName || storedName === 'Untitled') {
+          const firstUser = rows.find(r => r.role === 'user');
+          if (firstUser) storedName = generateChatName(firstUser.content);
+        }
+        updatePanelTitle(storedName);
         messages.innerHTML = rows.map(r=>{
           if (r.role==='assistant' && r.content.startsWith('[REFS]')){
             return `<li class="msg refs">${r.content.slice(6)}</li>`;
@@ -358,8 +431,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* ─── COMPOSER AUTO-RESIZE ────────────────────────────────────── */
   function autoGrow(){
-    input.style.height='46px';
-    if(input.scrollHeight>46) input.style.height=input.scrollHeight+'px';
+    input.style.height='56px';
+    if(input.scrollHeight>56) input.style.height=input.scrollHeight+'px';
   }
   input.addEventListener('input',autoGrow);
   input.addEventListener('keydown',e=>{
@@ -378,7 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hideWelcomeScreen();
 
     input.value = '';
-    input.style.height = '46px';
+    input.style.height = '56px';
     sendBtn.disabled = true;
 
     setTitle(q);
