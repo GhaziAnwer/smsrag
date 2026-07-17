@@ -145,10 +145,10 @@ body{display:flex;flex-direction:column}
   margin-top:10px;display:flex;gap:8px;
 }
 .copy-btn{
-  display:inline-flex;align-items:center;gap:6px;
+  display:inline-flex;align-items:center;justify-content:center;
   background:transparent;border:1px solid var(--border);border-radius:8px;
-  padding:5px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;
-  transition:.15s;font-family:inherit;
+  padding:7px;color:var(--muted);cursor:pointer;
+  transition:.15s;
 }
 .copy-btn:hover{color:var(--fg);border-color:rgba(40,34,28,.22);background:var(--surface)}
 .copy-btn.copied{color:var(--accent);border-color:var(--accent)}

@@ -241,13 +241,13 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
-  // Copy control shown at the end of every assistant answer.
+  // Copy control shown at the end of every assistant answer. Icon-only; the
+  // label lives in the tooltip (title). Swaps to a check on success.
+  const ICON_COPY = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>`;
+  const ICON_CHECK = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`;
   const COPY_BTN = `
       <div class="answer-actions">
-        <button class="copy-btn" type="button" title="Copy answer">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-          <span>Copy</span>
-        </button>
+        <button class="copy-btn" type="button" title="Copy" aria-label="Copy answer">${ICON_COPY}</button>
       </div>`;
 
   /* ─── SIMPLE ANSWER DISPLAY ───────────────────────────────────── */
@@ -726,13 +726,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const text = content ? content.innerText.trim() : '';
     if (!text) return;
     navigator.clipboard.writeText(text).then(() => {
-      const label = btn.querySelector('span');
-      const prev = label ? label.textContent : '';
       btn.classList.add('copied');
-      if (label) label.textContent = 'Copied';
+      btn.title = 'Copied';
+      btn.innerHTML = ICON_CHECK;
       setTimeout(() => {
         btn.classList.remove('copied');
-        if (label) label.textContent = prev || 'Copy';
+        btn.title = 'Copy';
+        btn.innerHTML = ICON_COPY;
       }, 1500);
     }).catch(err => console.warn('Copy failed:', err));
   });
