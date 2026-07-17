@@ -41,9 +41,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const welcomeScreen = document.getElementById('welcome-screen');
   const viewerToggle  = document.getElementById('viewer-toggle');
 
-  // Set when the user collapses the viewer by hand, so a later answer
-  // does not yank the panel back open against their wishes.
+  // Set when the user hides the viewer by hand, so a later answer does not
+  // yank the panel back open against their wishes.
   let userCollapsedViewer = false;
+  // Remember the most recently opened document so the header toggle can reopen
+  // it after an X close. Cleared when the conversation changes.
+  let lastDocUrl = null, lastDocTitle = null;
 
   /* ─── UTILITIES ────────────────────────────────────────────────── */
   function newId () {
@@ -107,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
       sessionStorage.setItem(`${STORAGE_PREFIX}CONV_ID`, CONV_ID);
       messages.innerHTML = '';
       showWelcomeScreen();
-      closeViewer();
+      resetViewer();
     }
 
     await renderThreads();
@@ -126,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
     CONV_ID = newId();
     sessionStorage.setItem(`${STORAGE_PREFIX}CONV_ID`, CONV_ID);
     messages.innerHTML = '';
-    closeViewer();
+    resetViewer();
     await renderThreads();
   }
 
@@ -234,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
     messages.innerHTML = '';       // clear before load
     await loadHistory();
 
-    if (!messages.querySelector('.refs-list .ref-link')) closeViewer();
+    if (!messages.querySelector('.refs-list .ref-link')) resetViewer();
   });
 
   newBtn.addEventListener('click', async ()=>{
@@ -243,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
     messages.innerHTML = '';
     showWelcomeScreen();
     await renderThreads();
-    closeViewer();
+    resetViewer();
   });
 
   // Suggestion chips (now a standalone block below the composer) fill the input.
@@ -474,14 +477,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     currentDocUrl = url;
-    
+    lastDocUrl = url;
+    lastDocTitle = title;
+
     docTitle.textContent = title || 'Loading...';
     docTitle.className = 'doc-loading';
 
     viewer.classList.add('open');
-    viewer.classList.remove('collapsed');
     userCollapsedViewer = false;
-    if (viewerToggle) viewerToggle.textContent = '❮';
+    revealViewerToggle();   // header button appears once a doc exists
+    updateToggleUi();       // -> "Hide document panel"
     viewer.classList.add('loading');
     
     const fullUrl = url.startsWith('http') ? url : `${DOC_BASE}${url}`;
@@ -522,33 +527,57 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 8000);
   }
 
+  // Low-level: hide the panel and drop the loaded doc. openDoc() early-returns
+  // when currentDocUrl === url, so this must clear it or re-opening no-ops.
   function closeViewer() {
     viewer.classList.remove('open');
-    viewer.classList.remove('collapsed');
-    if (viewerToggle) viewerToggle.textContent = '❮';
     frame.src = '';
-    // Must reset: openDoc() early-returns when currentDocUrl === url, so
-    // leaving it set makes re-clicking the same reference a no-op.
     currentDocUrl = null;
     docTitle.textContent = 'Document viewer';
     docTitle.className = '';
   }
 
-  vClose.addEventListener('click', closeViewer);
+  /* ─── HEADER PANEL TOGGLE ───────────────────────────────────────── */
+  function revealViewerToggle() { if (viewerToggle) viewerToggle.hidden = false; }
+  function hideViewerToggle()   { if (viewerToggle) viewerToggle.hidden = true; }
 
-  // Collapse/expand without tearing down the loaded document, so re-opening
-  // is instant. Distinct from closeViewer(), which fully discards it.
+  function updateToggleUi() {
+    if (!viewerToggle) return;
+    const shown = viewer.classList.contains('open');
+    viewerToggle.title = shown ? 'Hide document panel' : 'Show document panel';
+    viewerToggle.classList.toggle('active', shown);
+  }
+
+  // User hides the panel (via the header toggle or the X). The header toggle
+  // stays visible so the panel can be reopened without clicking a reference.
+  function hideViewer() {
+    closeViewer();
+    userCollapsedViewer = true;   // don't auto-open on the next answer
+    updateToggleUi();             // -> "Show document panel"
+  }
+
+  // User shows the panel again — reopen the last document.
+  function showViewer() {
+    if (lastDocUrl) openDoc(lastDocUrl, lastDocTitle);
+  }
+
+  // Conversation changed (new / switched / deleted): forget the document and
+  // remove the header toggle entirely.
+  function resetViewer() {
+    lastDocUrl = null;
+    lastDocTitle = null;
+    userCollapsedViewer = false;
+    closeViewer();
+    hideViewerToggle();
+    updateToggleUi();
+  }
+
+  vClose.addEventListener('click', hideViewer);
+
   if (viewerToggle) {
     viewerToggle.addEventListener('click', () => {
-      if (viewer.classList.contains('collapsed')) {
-        viewer.classList.remove('collapsed');
-        viewerToggle.textContent = '❮';
-        userCollapsedViewer = false;
-      } else {
-        viewer.classList.add('collapsed');
-        viewerToggle.textContent = '❯';
-        userCollapsedViewer = true;
-      }
+      if (viewer.classList.contains('open')) hideViewer();
+      else showViewer();
     });
   }
 

@@ -63,6 +63,18 @@ body{display:flex;flex-direction:column}
 .action:hover{border-color:rgba(40,34,28,.24);background:var(--surface);color:var(--fg)}
 .action i{font-style:normal}
 
+/* Document-panel toggle: icon-only header button. Appears (JS clears [hidden])
+   once a document has been opened; .active = panel currently shown. */
+.nav-toggle{
+  display:flex;align-items:center;justify-content:center;
+  width:38px;height:36px;padding:0;cursor:pointer;
+  background:transparent;color:#5c574f;border:1px solid var(--border);
+  border-radius:10px;transition:.15s;
+}
+.nav-toggle:hover{border-color:rgba(40,34,28,.24);background:var(--surface);color:var(--fg)}
+.nav-toggle.active{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+.nav-toggle[hidden]{display:none}
+
 /* Removed with the notice bar (Change A) — kept for reference
 .notice{
   text-align:center;font-size:12px;padding:4px 8px;background:#fff3f4;color:#c13248;
@@ -206,10 +218,9 @@ body{display:flex;flex-direction:column}
 .typing span:nth-child(3){animation-delay:.4s}
 
 /* ─── VIEWER ────────────────────────────────────────────────────── */
-/* Hidden by default, slides in when a document opens.
-   .viewer is the layout/positioning shell and stays overflow:visible so the
-   toggle tab can stick out past its left edge. All visible chrome and content
-   live in .viewer-body, which clips (overflow:hidden). */
+/* Hidden by default, slides in when a document opens. The show/hide control
+   now lives in the header (.nav-toggle), so nothing protrudes and .viewer
+   clips normally. */
 .viewer{
   flex:0 0 0;
   min-width:0;
@@ -217,7 +228,7 @@ body{display:flex;flex-direction:column}
   position:relative;
   transition:flex-basis .35s cubic-bezier(.4,0,.2,1),
              min-width  .35s cubic-bezier(.4,0,.2,1);
-  overflow:visible;
+  overflow:hidden;
 }
 
 .viewer.open{
@@ -225,15 +236,7 @@ body{display:flex;flex-direction:column}
   min-width:320px;
 }
 
-/* User-collapsed: same zero width as closed, but the tab stays visible. */
-.viewer.open.collapsed{
-  flex:0 0 0;
-  min-width:0;
-}
-
-/* Inner wrapper: clips content and holds the panel's background + border.
-   flex:1 1 0% would not apply here (parent is not flex), so it fills via
-   width/height:100%; it is itself a flex column for the head + iframe. */
+/* Inner wrapper: clips content and holds the panel's background + border. */
 .viewer-body{
   width:100%;
   height:100%;
@@ -244,38 +247,6 @@ body{display:flex;flex-direction:column}
   background:var(--surface);
   box-shadow:inset 0 0 0 1px var(--border);
 }
-
-/* Viewer toggle — slim grip vertically centered on the chat/viewer divider,
-   like a drawer pull. Sticks out past .viewer's left edge (overflow:visible),
-   so it stays reachable whether the panel is expanded or collapsed to zero. */
-.viewer-toggle-btn{
-  position:absolute;
-  top:50%;
-  left:-22px;
-  transform:translateY(-50%);
-  width:22px;
-  height:56px;
-  background:var(--accent);
-  color:#fff;
-  border:none;
-  cursor:pointer;
-  border-radius:8px 0 0 8px;
-  font-size:12px;
-  font-weight:bold;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  box-shadow:-3px 2px 8px rgba(0,0,0,.14);
-  z-index:20;
-  transition:background .2s;
-  padding:0;
-  line-height:1;
-}
-
-.viewer-toggle-btn:hover{background:var(--accent-2)}
-
-.viewer.open .viewer-toggle-btn{display:flex}
-.viewer.open.collapsed .viewer-toggle-btn{display:flex}
 
 .viewer-head{
   height:48px;display:flex;justify-content:space-between;align-items:center;
@@ -370,20 +341,16 @@ body{display:flex;flex-direction:column}
   .chat{flex:1}
   .viewer{display:none}
 
-  /* .visible -> .open: the state class was renamed in Change C. Without
-     this the panel could never appear on mobile. */
+  /* Full-screen overlay on mobile when a document is open. */
   .viewer.open{
     display:flex;
     position:fixed;
-    top:56px;
+    top:60px;
     left:0;
     right:0;
     bottom:0;
     z-index:1000;
   }
-
-  /* Full-screen overlay on mobile, so collapsing means hiding outright. */
-  .viewer.open.collapsed{display:none}
 }
 
 /* ─── ICONS ─────────────────────────────────────────────────────── */
