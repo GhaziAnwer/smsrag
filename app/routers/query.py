@@ -1294,6 +1294,53 @@ async def get_history(request: Request, conversation_id: Optional[str] = None):
 
 
 # ============================================================================
+# CHAT TITLE ENDPOINT (LLM-generated conversation name)
+# ============================================================================
+@router.post("/title")
+def generate_title(req: AskRequest):
+    """
+    Generate a short, topic-based conversation title from the first question.
+    Reuses AskRequest (the UI sends client_id + question). Returns {"title": ...};
+    an empty string on any failure so the client can fall back to its heuristic.
+    """
+    question = (req.question or "").strip()
+    if not question:
+        return {"title": ""}
+    try:
+        from openai import OpenAI
+
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("[TITLE] OPENAI_API_KEY not set")
+            return {"title": ""}
+
+        client = OpenAI(api_key=api_key)
+        resp = client.chat.completions.create(
+            model=os.getenv("OPENAI_TITLE_MODEL", os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")),
+            messages=[
+                {"role": "system", "content": (
+                    "You generate a very short title for a chat conversation based on the "
+                    "user's first question about a ship Safety Management System. Reply with "
+                    "ONLY the title: 2 to 4 words, Title Case, no quotes, no trailing "
+                    "punctuation. Name the specific topic, not the question form."
+                )},
+                {"role": "user", "content": question},
+            ],
+            temperature=0.2,
+            max_tokens=16,
+        )
+        title = (resp.choices[0].message.content or "").strip()
+        # Sanitise: drop surrounding quotes/trailing punctuation, cap length.
+        title = title.strip().strip('"\'').rstrip(".").strip()
+        title = " ".join(title.split()[:6])[:40].strip()
+        logger.info(f"[TITLE] '{question[:40]}...' -> '{title}'")
+        return {"title": title}
+    except Exception as e:
+        logger.warning(f"[TITLE] generation failed: {e}")
+        return {"title": ""}
+
+
+# ============================================================================
 # CONVERSATIONS LIST ENDPOINT
 # ============================================================================
 @router.get("/conversations")

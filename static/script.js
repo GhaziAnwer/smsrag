@@ -127,10 +127,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // If a chat name already exists on another conversation, append the next
   // number: "Fire Safety" -> "Fire Safety2" -> "Fire Safety3".
-  function dedupeChatName(base){
+  function dedupeChatName(base, convId = CONV_ID){
     const ids = JSON.parse(localStorage.getItem(`${STORAGE_PREFIX}THREADS`)||'[]');
     const used = new Set(
-      ids.filter(id => id !== CONV_ID)
+      ids.filter(id => id !== convId)
          .map(id => localStorage.getItem(`${STORAGE_PREFIX}${id}_title`))
          .filter(Boolean)
     );
@@ -149,10 +149,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const key = `${STORAGE_PREFIX}${CONV_ID}_title`;
     const cur = localStorage.getItem(key)||'';
     if(cur && cur !== 'Untitled'){ updatePanelTitle(cur); return; }
-    const name = dedupeChatName(generateChatName(question));
-    localStorage.setItem(key, name);
+    // Instant heuristic placeholder so the header is never empty…
+    const placeholder = dedupeChatName(generateChatName(question));
+    localStorage.setItem(key, placeholder);
     saveThread(CONV_ID);
-    updatePanelTitle(name);
+    updatePanelTitle(placeholder);
+    // …then refine with an LLM-generated title in the background.
+    refineTitleWithLLM(question, CONV_ID, placeholder);
+  }
+
+  // Ask the backend for a nicer LLM title and swap it in once it arrives.
+  // Any failure leaves the heuristic placeholder in place.
+  async function refineTitleWithLLM(question, convId, placeholder){
+    let title = '';
+    try {
+      const res = await fetch(`${API_BASE}/title`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, client_id: CLIENT_ID })
+      });
+      if (!res.ok) return;
+      title = ((await res.json()).title || '').trim();
+    } catch (e) { return; }
+    if (!title) return;
+    const key = `${STORAGE_PREFIX}${convId}_title`;
+    // Only replace if our placeholder is still the stored title (the user
+    // hasn't renamed it and the conversation wasn't reset).
+    if (localStorage.getItem(key) !== placeholder) return;
+    title = dedupeChatName(title, convId);
+    localStorage.setItem(key, title);
+    if (convId === CONV_ID) updatePanelTitle(title);
+    renderThreads();
   }
   
   async function deleteThread(id) {
