@@ -954,6 +954,44 @@ def _detect_query_intent(query: str) -> Dict[str, Any]:
 # ============================================================================
 # MAIN ASK ENDPOINT
 # ============================================================================
+def _smalltalk_reply(question: str) -> Optional[str]:
+    """Return a conversational reply for greetings/pleasantries, else None.
+
+    Only very short messages qualify, so a real question that merely contains a
+    greeting word ("hi, what is the fire drill procedure") still goes to
+    retrieval.
+    """
+    q = re.sub(r"[^a-z\s]", "", (question or "").lower()).strip()
+    if not q:
+        return None
+    words = q.split()
+    if len(words) > 4:
+        return None
+
+    joined = " ".join(words)
+    greetings = {"hi", "hii", "hiii", "hello", "helloo", "hey", "heya", "hiya",
+                 "yo", "hola", "greetings", "howdy", "namaste", "salaam", "salam"}
+    thanks = {"thanks", "thank", "thankyou", "thx", "ty", "cheers"}
+    byes = {"bye", "goodbye", "cya", "ciao"}
+
+    help_line = ("I'm your Safety Management System assistant. Ask me anything about "
+                 "your SMS procedures — emergency response, enclosed space entry, drills, "
+                 "maintenance, or any specific chapter. How can I help?")
+
+    if joined in {"good morning", "good afternoon", "good evening", "good day"}:
+        return f"{joined.capitalize()}! {help_line}"
+    if joined in {"how are you", "how are you doing", "hows it going",
+                  "how do you do", "whats up", "sup", "you good"}:
+        return f"I'm doing well, thanks for asking! {help_line}"
+    if any(w in thanks for w in words):
+        return "You're welcome! Let me know if there's anything else about your SMS I can help with."
+    if any(w in byes for w in words):
+        return "Goodbye! Come back anytime you have questions about your Safety Management System."
+    if any(w in greetings for w in words) and len(words) <= 3:
+        return f"Hello! {help_line}"
+    return None
+
+
 @router.post("/ask", response_model=AskResponse)
 def ask(req: AskRequest, request: Request):
     """Main RAG endpoint with section-awareness and document summarization."""
@@ -967,7 +1005,29 @@ def ask(req: AskRequest, request: Request):
     
     try:
         logger.info(f"[ASK] client={req.client_id}, question={req.question[:80]}...]")
-        
+
+        # Greeting / small talk — reply conversationally and skip retrieval.
+        smalltalk = _smalltalk_reply(req.question)
+        if smalltalk is not None:
+            logger.info("[ASK] 👋 Small talk detected — returning greeting, skipping retrieval")
+            if req.conversation_id:
+                try:
+                    _db_insert_message(req.client_id, req.conversation_id, "user", req.question)
+                    _db_insert_message(req.client_id, req.conversation_id, "assistant", smalltalk)
+                except Exception as db_err:
+                    logger.error(f"[HISTORY][SQLite] greeting persist failed: {db_err}")
+                try:
+                    history_key = f"{req.client_id}_{req.conversation_id}"
+                    CONVERSATION_HISTORY[history_key].append({"role": "user", "content": req.question})
+                    CONVERSATION_HISTORY[history_key].append({"role": "assistant", "content": smalltalk})
+                except Exception as hist_err:
+                    logger.warning(f"[HISTORY][Memory] greeting store failed: {hist_err}")
+            return AskResponse(
+                answer=smalltalk,
+                references=[],
+                meta={"client_id": req.client_id, "smalltalk": True},
+            )
+
         # Query enhancement & intent detection
         enhanced_query = _enhance_query_for_forms(req.question)
         
