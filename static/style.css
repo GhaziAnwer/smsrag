@@ -414,9 +414,8 @@ button:focus {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  flex: 1;
-  padding: 40px 24px;
+  flex: 0 0 auto;
+  padding: 0 24px;
   text-align: center;
   animation: fadeIn 0.3s ease;
 }
@@ -425,11 +424,17 @@ button:focus {
   display: none;
 }
 
-/* While the welcome screen is up, #messages is empty but would still
-   claim flex:1 and push the welcome block off-centre, and .page-title
-   would duplicate the welcome heading. Collapse both. */
+/* Landing: center greeting + composer + chips as one vertical cluster (like
+   Claude's home screen) so the composer sits directly under the greeting
+   instead of pinned to the bottom of the panel. #messages is empty here and
+   .page-title would duplicate the heading, so both are removed from flow. */
+.chat.chat-empty {
+  justify-content: center;
+  gap: 22px;
+}
+
 .chat.chat-empty .messages {
-  flex: 0 0 auto;
+  display: none;
 }
 
 .chat.chat-empty .page-title {
@@ -455,13 +460,22 @@ button:focus {
 .welcome-subtitle {
   font-size: 15px;
   color: var(--muted);
-  margin: 0 0 34px 0;
+  margin: 0;   /* the .chat-empty cluster gap handles spacing below */
 }
 
+/* Chips are a standalone block below the composer, shown only on the landing
+   screen and width-matched to the composer. */
 .welcome-suggestions {
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.chat.chat-empty .welcome-suggestions {
+  display: flex;
 }
 
 /* Warm card chips; the leading marker picks up the brand blue. */

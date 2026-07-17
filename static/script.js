@@ -246,8 +246,8 @@ document.addEventListener('DOMContentLoaded', () => {
     closeViewer();
   });
 
-  // Suggestion chips on the welcome screen fill the composer.
-  welcomeScreen?.addEventListener('click', e => {
+  // Suggestion chips (now a standalone block below the composer) fill the input.
+  chatPanel?.addEventListener('click', e => {
     const btn = e.target.closest('.suggestion-btn');
     if (!btn) return;
     input.value = btn.textContent.trim();

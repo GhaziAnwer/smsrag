@@ -33,11 +33,6 @@
       <div class="welcome-content">
         <h2 class="welcome-title serif">Good evening</h2>
         <p class="welcome-subtitle">Ask anything about your Safety Management System</p>
-        <div class="welcome-suggestions">
-          <button type="button" class="suggestion-btn">What are the emergency procedures for fire on board?</button>
-          <button type="button" class="suggestion-btn">What is the enclosed space entry procedure?</button>
-          <button type="button" class="suggestion-btn">Who is responsible for safety drills?</button>
-        </div>
       </div>
     </div>
 
@@ -45,6 +40,15 @@
       <textarea id="chat-input" placeholder="Ask anything …" rows="1" spellcheck="true"></textarea>
       <button id="send-btn" title="Send"><i class="i-send"></i></button>
     </form>
+
+    <!-- Chips live below the composer so on the landing screen the order is
+         greeting -> composer -> chips (one centered cluster). Hidden once a
+         conversation starts (CSS keys off .chat-empty). -->
+    <div id="welcome-suggestions" class="welcome-suggestions">
+      <button type="button" class="suggestion-btn">What are the emergency procedures for fire on board?</button>
+      <button type="button" class="suggestion-btn">What is the enclosed space entry procedure?</button>
+      <button type="button" class="suggestion-btn">Who is responsible for safety drills?</button>
+    </div>
   </section>
 
   <!-- VIEWER -->
