@@ -95,10 +95,12 @@ body{display:flex;flex-direction:column}
 
 /* ─── MESSAGES ──────────────────────────────────────────────────── */
 /* Centered reading column, like the mockup's single-column conversation. */
+/* Full-width scroll container (scrollbar sits at the panel's right edge, not
+   floating in the middle) with the reading column centered via padding. */
 .messages{
   flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:24px;
-  padding:4px 2px;scroll-behavior:smooth;
-  width:100%;max-width:760px;margin:0 auto
+  scroll-behavior:smooth;width:100%;
+  padding:4px max(6px, calc((100% - 760px) / 2));
 }
 .messages::-webkit-scrollbar{width:8px}
 .messages::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:4px}
@@ -137,6 +139,20 @@ body{display:flex;flex-direction:column}
 .answer-content strong{
   color:var(--accent);
 }
+
+/* ─── ANSWER ACTIONS (copy) ─────────────────────────────────────── */
+.answer-actions{
+  margin-top:10px;display:flex;gap:8px;
+}
+.copy-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  background:transparent;border:1px solid var(--border);border-radius:8px;
+  padding:5px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;
+  transition:.15s;font-family:inherit;
+}
+.copy-btn:hover{color:var(--fg);border-color:rgba(40,34,28,.22);background:var(--surface)}
+.copy-btn.copied{color:var(--accent);border-color:var(--accent)}
+.copy-btn svg{flex:none}
 
 /* ─── SIMPLE REFERENCES ──────────────────────────────────────────── */
 .refs-section{

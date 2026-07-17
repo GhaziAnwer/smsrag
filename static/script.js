@@ -241,14 +241,24 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  // Copy control shown at the end of every assistant answer.
+  const COPY_BTN = `
+      <div class="answer-actions">
+        <button class="copy-btn" type="button" title="Copy answer">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          <span>Copy</span>
+        </button>
+      </div>`;
+
   /* ─── SIMPLE ANSWER DISPLAY ───────────────────────────────────── */
   function buildAnswer(data) {
     const { answer, references } = data;
     const refsHTML = buildSimpleRefs(references);
-    
+
     return `
       <div class="answer-content">${md.makeHtml(answer)}</div>
       ${refsHTML}
+      ${COPY_BTN}
     `;
   }
 
@@ -420,11 +430,10 @@ document.addEventListener('DOMContentLoaded', () => {
           if (r.role==='assistant' && r.content.startsWith('[REFS]')){
             return `<li class="msg refs">${r.content.slice(6)}</li>`;
           }
-          const cls  = r.role==='user' ? 'u' : 'ai';
-          const html = r.role==='assistant'
-                       ? md.makeHtml(r.content)
-                       : esc(r.content);
-          return `<li class="msg ${cls}">${html}</li>`;
+          if (r.role==='assistant'){
+            return `<li class="msg ai"><div class="answer-content">${md.makeHtml(r.content)}</div>${COPY_BTN}</li>`;
+          }
+          return `<li class="msg u">${esc(r.content)}</li>`;
         }).join('');
 
         messages.scrollTop = messages.scrollHeight;
@@ -702,11 +711,30 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (url) {
       openDoc(url, title);
-      
+
       // Visual feedback - highlight active link
       document.querySelectorAll('.ref-link').forEach(l => l.classList.remove('active'));
       link.classList.add('active');
     }
+  });
+
+  // Copy an answer to the clipboard.
+  messages.addEventListener('click', e => {
+    const btn = e.target.closest('.copy-btn');
+    if (!btn) return;
+    const content = btn.closest('.msg.ai')?.querySelector('.answer-content');
+    const text = content ? content.innerText.trim() : '';
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      const label = btn.querySelector('span');
+      const prev = label ? label.textContent : '';
+      btn.classList.add('copied');
+      if (label) label.textContent = 'Copied';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        if (label) label.textContent = prev || 'Copy';
+      }, 1500);
+    }).catch(err => console.warn('Copy failed:', err));
   });
 
   /* ─── INIT ──────────────────────────────────────────────────────── */
