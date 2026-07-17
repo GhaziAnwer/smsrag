@@ -79,22 +79,27 @@
 <!-- tenant bootstrap (auto-detects client from URL) -->
 <script>
 (() => {
-  // 1. Figure out first path segment, e.g. "" | "maran" | "supereco"
+  // 1. Figure out path segments, e.g. "" | "maran" | "smsrag" "rsms"
   const pathSegments = location.pathname.split('/').filter(Boolean);
-  const slug = pathSegments[0] || ''; // First segment after domain
+
+  // This app is served two ways:
+  //  - at the domain root:       chatai.sl-sail.com/<tenant>
+  //  - behind an nginx prefix:   viqmap.sl-sail.com/smsrag/<tenant>
+  // so the tenant slug is either the 1st or 2nd path segment depending on
+  // whether the "smsrag" mount prefix is present.
+  const mountPrefix = pathSegments[0] === 'smsrag' ? 'smsrag' : '';
+  const slug = mountPrefix ? (pathSegments[1] || '') : (pathSegments[0] || '');
 
   // 2. Normalise special cases (root = RSMS)
   const clientId   = slug || 'rsms';        // rsms / maran / supereco / …
 
-  // 3. Build API base ->  /api            (rsms)
-  //                       /maran/api      (maran)
-  //                       /supereco/api   (supereco)
-  //window.API_BASE      = slug ? `/${slug}/api` : '/api';
+  // 3. Build API base ->  /api                  (rsms, root mount)
+  //                       /maran/api            (maran, root mount)
+  //                       /smsrag/rsms/api      (rsms, /smsrag mount)
+  window.API_BASE      = mountPrefix ? `/${mountPrefix}/${clientId}/api` : `/${clientId}/api`;
+  window.MOUNT_PREFIX  = mountPrefix;
 
-    window.API_BASE = `/${clientId}/api`;  
-// 4. Pretty label for the UI badge
-  //window.CLIENT_LABEL  = clientId.toUpperCase();
-  // 4. Pretty label for the UI badge   
+  // 4. Pretty label for the UI badge
   window.CLIENT_LABEL  = clientId.toUpperCase();
   window.CLIENT_ID     = clientId;
 })();

@@ -4,7 +4,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* ─── CONFIG & DOM REFS ────────────────────────────────────────── */
   const API_BASE = window.API_BASE || `${location.origin}/api`;
-  const DOC_BASE = location.origin;
+  // Document links come back from the backend as /{client_id}/docs/...;
+  // when served behind the /smsrag mount (viqmap.sl-sail.com) that prefix
+  // must be re-added so nginx's /smsrag/<tenant>/docs/ location matches.
+  const DOC_BASE = window.MOUNT_PREFIX ? `${location.origin}/${window.MOUNT_PREFIX}` : location.origin;
 
   const CLIENT_ID = window.CLIENT_ID || 'rsms';
   const STORAGE_PREFIX = `${CLIENT_ID}_`;
