@@ -954,16 +954,68 @@ def _detect_query_intent(query: str) -> Dict[str, Any]:
 # ============================================================================
 # MAIN ASK ENDPOINT
 # ============================================================================
-def _smalltalk_reply(question: str) -> Optional[str]:
-    """Return a conversational reply for greetings/pleasantries, else None.
+_CAPABILITY_TEXT = (
+    "I'm your Safety Management System assistant. When you ask a question, I search your "
+    "SMS documents, find the most relevant sections, and give you a concise answer with "
+    "references to the exact source — which you can open in the panel on the right. Try "
+    "asking about any procedure or topic, for example: 'What is the enclosed space entry "
+    "procedure?'"
+)
 
-    Only very short messages qualify, so a real question that merely contains a
-    greeting word ("hi, what is the fire drill procedure") still goes to
-    retrieval.
+
+def _is_capability_question(q: str) -> bool:
+    """True for meta questions about the assistant itself / how it works.
+
+    Uses specific, end-anchored patterns so real procedure questions phrased with
+    "how do you ..." (e.g. "how do you respond to a fire") are NOT caught.
     """
-    q = re.sub(r"[^a-z\s]", "", (question or "").lower()).strip()
+    exact = {
+        "who are you", "what are you", "what can you do", "what do you do",
+        "how do you work", "how does this work", "how do you answer",
+        "how do you answers", "how you answer", "how can you help",
+        "how can you help me", "what can you help with", "what can you help me with",
+        "how do you function", "how do you help", "what is this", "how to use this",
+        "how do i use this", "how do i use you", "are you ai", "are you a bot",
+        "are you a robot", "what are you capable of", "how were you made",
+        "how were you trained", "how do you find answers", "how do you generate answers",
+        "how do you get answers", "how do you provide answers", "what do you do exactly",
+        "how do you do this", "what can you tell me", "how do you know",
+    }
+    if q in exact:
+        return True
+    if re.search(r"^how (do|does|can) (you|this) "
+                 r"(work|answer|answers|function|help|respond|reply|find|generate|get|provide)"
+                 r"( questions?| me)?$", q):
+        return True
+    if re.search(r"^what (can|do) you (do|answer|help|provide|offer)( questions?)?$", q):
+        return True
+    if re.search(r"^(who|what) are you$", q):
+        return True
+    return False
+
+
+def _smalltalk_reply(question: str) -> Optional[str]:
+    """Detector + offline fallback for greetings, pleasantries, and meta/capability
+    questions about the assistant. Returns canned text or None.
+
+    Greetings require a short message so a real question that merely contains a
+    greeting word ("hi, what is the fire drill procedure") still goes to retrieval;
+    capability questions match specific end-anchored phrases instead.
+    """
+    q = re.sub(r"[^a-z\s]", " ", (question or "").lower())
+    q = " ".join(q.split())
     if not q:
         return None
+
+    # Normalise chat shorthand and strip a leading filler word before matching.
+    qn = f" {q} ".replace(" u ", " you ").replace(" ur ", " your ").replace(" r ", " are ")
+    qn = re.sub(r"^(ok|okay|so|well|hey|hi|hello|please|pls|and|but)\s+", "", qn.strip()).strip()
+
+    # 1) Meta / capability questions about the assistant (any length).
+    if _is_capability_question(qn):
+        return _CAPABILITY_TEXT
+
+    # 2) Greetings / pleasantries — short messages only.
     words = q.split()
     if len(words) > 4:
         return None
@@ -1008,11 +1060,16 @@ def _llm_smalltalk_reply(question: str) -> Optional[str]:
             messages=[
                 {"role": "system", "content": (
                     "You are a friendly assistant for a ship Safety Management System (SMS). "
-                    "The user sent a greeting or small talk, not a real question. Reply in 1-2 "
-                    "short, warm sentences: respond naturally to what they said, then invite them "
-                    "to ask about their SMS (e.g. emergency procedures, enclosed space entry, "
-                    "drills, maintenance). Do not invent SMS facts and do not answer a question "
-                    "that wasn't asked. Plain sentences only — no lists or headings."
+                    "The user sent a greeting, small talk, or a question about you / how you "
+                    "work — NOT a real SMS question. Reply in plain sentences (no lists or "
+                    "headings):\n"
+                    "- Greeting or pleasantry: respond warmly in 1-2 sentences and invite them "
+                    "to ask about their SMS.\n"
+                    "- Question about what you are or how you work/answer: briefly explain (2-3 "
+                    "sentences) that you answer questions about their Safety Management System by "
+                    "searching their SMS documents and giving answers with references to the "
+                    "source, then invite a question.\n"
+                    "Do not invent SMS facts and do not answer a question that wasn't asked."
                 )},
                 {"role": "user", "content": question},
             ],
