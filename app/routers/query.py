@@ -992,6 +992,40 @@ def _smalltalk_reply(question: str) -> Optional[str]:
     return None
 
 
+def _llm_smalltalk_reply(question: str) -> Optional[str]:
+    """Natural, LLM-phrased reply for a greeting/pleasantry. None on failure so
+    the caller can fall back to the canned reply."""
+    try:
+        from openai import OpenAI
+
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return None
+
+        client = OpenAI(api_key=api_key)
+        resp = client.chat.completions.create(
+            model=os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
+            messages=[
+                {"role": "system", "content": (
+                    "You are a friendly assistant for a ship Safety Management System (SMS). "
+                    "The user sent a greeting or small talk, not a real question. Reply in 1-2 "
+                    "short, warm sentences: respond naturally to what they said, then invite them "
+                    "to ask about their SMS (e.g. emergency procedures, enclosed space entry, "
+                    "drills, maintenance). Do not invent SMS facts and do not answer a question "
+                    "that wasn't asked. Plain sentences only — no lists or headings."
+                )},
+                {"role": "user", "content": question},
+            ],
+            temperature=0.7,
+            max_tokens=80,
+        )
+        text = (resp.choices[0].message.content or "").strip()
+        return text or None
+    except Exception as e:
+        logger.warning(f"[ASK] small-talk LLM failed: {e}")
+        return None
+
+
 @router.post("/ask", response_model=AskResponse)
 def ask(req: AskRequest, request: Request):
     """Main RAG endpoint with section-awareness and document summarization."""
@@ -1007,23 +1041,26 @@ def ask(req: AskRequest, request: Request):
         logger.info(f"[ASK] client={req.client_id}, question={req.question[:80]}...]")
 
         # Greeting / small talk — reply conversationally and skip retrieval.
-        smalltalk = _smalltalk_reply(req.question)
-        if smalltalk is not None:
-            logger.info("[ASK] 👋 Small talk detected — returning greeting, skipping retrieval")
+        # _smalltalk_reply is the detector (+ offline fallback); the wording is
+        # LLM-generated when available.
+        canned_smalltalk = _smalltalk_reply(req.question)
+        if canned_smalltalk is not None:
+            reply = _llm_smalltalk_reply(req.question) or canned_smalltalk
+            logger.info("[ASK] 👋 Small talk — conversational reply, skipping retrieval")
             if req.conversation_id:
                 try:
                     _db_insert_message(req.client_id, req.conversation_id, "user", req.question)
-                    _db_insert_message(req.client_id, req.conversation_id, "assistant", smalltalk)
+                    _db_insert_message(req.client_id, req.conversation_id, "assistant", reply)
                 except Exception as db_err:
                     logger.error(f"[HISTORY][SQLite] greeting persist failed: {db_err}")
                 try:
                     history_key = f"{req.client_id}_{req.conversation_id}"
                     CONVERSATION_HISTORY[history_key].append({"role": "user", "content": req.question})
-                    CONVERSATION_HISTORY[history_key].append({"role": "assistant", "content": smalltalk})
+                    CONVERSATION_HISTORY[history_key].append({"role": "assistant", "content": reply})
                 except Exception as hist_err:
                     logger.warning(f"[HISTORY][Memory] greeting store failed: {hist_err}")
             return AskResponse(
-                answer=smalltalk,
+                answer=reply,
                 references=[],
                 meta={"client_id": req.client_id, "smalltalk": True},
             )
