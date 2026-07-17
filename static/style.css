@@ -3,33 +3,42 @@
 /* ─── BASE STYLES ──────────────────────────────────────────────── */
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#f5f7fc;
-  --fg:#0f1527;
-  --accent:#1754ff;
+  /* Warm neutral surfaces (from the Claude "Lumen" mockup) with the existing
+     brand blue kept as the action/accent colour. */
+  --bg:#f4f2ec;          /* warm cream page background */
+  --surface:#fbfaf7;     /* cards: composer, chips, viewer */
+  --surface-2:#efece5;   /* subtle fills: user bubble, hovers */
+  --fg:#33302b;          /* warm near-black text */
+  --muted:#8a857b;       /* secondary text */
+  --border:rgba(40,34,28,.10);
+  --accent:#1754ff;      /* brand blue — send, links, active states */
   --accent-2:#2468ff;
-  --glass:rgba(255,255,255,.6);
+  --accent-soft:#e9edfb; /* soft blue tint for active/hover surfaces */
+  --glass:rgba(251,250,247,.72);
   --blur:14px;
   --radius:16px;
-  --shadow:0 4px 24px rgba(0,0,0,.1);
-  --scroll:#c3cfe9;
-  
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 12px 32px -18px rgba(0,0,0,.18);
+  --scroll:#d8d3c8;
+
   font-size:14px;
   font-family:'Inter',Arial,sans-serif;
 }
-html,body{height:100%;background:var(--bg);color:var(--fg)}
+html,body{height:100%;background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
 body{display:flex;flex-direction:column}
 
 .glass{
   background:var(--glass);
   backdrop-filter:blur(var(--blur));
   -webkit-backdrop-filter:blur(var(--blur));
-  box-shadow:var(--shadow);
 }
+
+/* Serif display face for the greeting, matching the mockup. */
+.serif{font-family:'Newsreader',Georgia,serif}
 
 /* ─── NAV BAR ───────────────────────────────────────────────────── */
 .nav{
-  height:56px;display:flex;align-items:center;justify-content:space-between;
-  padding:0 20px;background:#fff;border-bottom:1px solid #dde3f4;
+  height:60px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 26px;background:transparent;border-bottom:1px solid var(--border);
 }
 /* Removed with the branding block (Change A) — kept for reference
 .brand{font-size:18px;font-weight:600;display:flex;align-items:center;gap:6px}
@@ -41,16 +50,17 @@ body{display:flex;flex-direction:column}
 .nav-actions>*{flex:0 0 auto}
 
 .client-badge{
-  background:var(--accent);color:#fff;font-size:13px;padding:6px 12px;
-  border-radius:var(--radius);white-space:nowrap;opacity:.9;
+  background:var(--accent);color:#fff;font-size:12.5px;font-weight:600;
+  padding:7px 14px;border-radius:10px;white-space:nowrap;letter-spacing:.2px;
 }
 
+/* Subtle bordered pills (like the mockup's "Upgrade"), not solid blue blocks. */
 .action{
-  display:flex;align-items:center;gap:6px;border:none;cursor:pointer;
-  background:var(--accent);color:#fff;padding:7px 14px;
-  font-size:13px;font-weight:600;border-radius:var(--radius);transition:.15s;
+  display:flex;align-items:center;gap:7px;cursor:pointer;
+  background:transparent;color:#5c574f;border:1px solid var(--border);
+  padding:8px 14px;font-size:13px;font-weight:500;border-radius:10px;transition:.15s;
 }
-.action:hover{background:var(--accent-2);transform:translateY(-1px)}
+.action:hover{border-color:rgba(40,34,28,.24);background:var(--surface);color:var(--fg)}
 .action i{font-style:normal}
 
 /* Removed with the notice bar (Change A) — kept for reference
@@ -66,22 +76,33 @@ body{display:flex;flex-direction:column}
    viewer is collapsed, and yields to it when a document opens. */
 .chat{
   flex:1;min-width:260px;display:flex;flex-direction:column;
-  padding:14px;gap:10px;background:#fff;border-right:1px solid #e4e9f6
+  padding:18px 20px;gap:14px;background:var(--bg);border-right:1px solid var(--border)
 }
 
 .page-title{font-size:18px;font-weight:600;text-align:left;opacity:.8}
 
 /* ─── MESSAGES ──────────────────────────────────────────────────── */
+/* Centered reading column, like the mockup's single-column conversation. */
 .messages{
-  flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:16px;
-  padding-right:6px;scroll-behavior:smooth
+  flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:24px;
+  padding:4px 2px;scroll-behavior:smooth;
+  width:100%;max-width:760px;margin:0 auto
 }
 .messages::-webkit-scrollbar{width:8px}
 .messages::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:4px}
 
-.msg{max-width:88%;padding:12px 16px;border-radius:var(--radius);line-height:1.4}
-.msg.u {background:var(--accent-2);color:#fff;margin-left:auto;animation:fadeIn .25s}
-.msg.ai{background:#fff;animation:fadeIn .25s;max-width:95%}
+.msg{line-height:1.55}
+/* User: warm rounded bubble, right-aligned (asymmetric corner like the mockup). */
+.msg.u{
+  max-width:80%;margin-left:auto;padding:12px 17px;
+  background:var(--surface-2);color:var(--fg);
+  border-radius:18px 18px 5px 18px;font-size:15px;animation:fadeIn .25s
+}
+/* Assistant: no bubble — plain text in the reading column. */
+.msg.ai{
+  max-width:100%;background:transparent;padding:0;
+  font-size:15px;animation:fadeIn .25s
+}
 
 /* ─── ANSWER CONTENT ───────────────────────────────────────────── */
 .answer-content{
@@ -109,14 +130,14 @@ body{display:flex;flex-direction:column}
 .refs-section{
   margin-top:12px;
   padding-top:12px;
-  border-top:1px solid #e4e9f6;
+  border-top:1px solid var(--border);
 }
 
 .refs-section strong{
   display:block;
   font-size:13px;
   font-weight:600;
-  color:#666;
+  color:var(--muted);
   margin-bottom:6px;
 }
 
@@ -139,32 +160,41 @@ body{display:flex;flex-direction:column}
 }
 
 .ref-link:hover{
-  background:#f0f4ff;
+  background:var(--accent-soft);
   border-left-color:var(--accent);
   padding-left:14px;
 }
 
 .ref-link.active{
-  background:#e8f0ff;
+  background:var(--accent-soft);
   border-left-color:var(--accent);
   font-weight:600;
 }
 
 /* ─── COMPOSER ──────────────────────────────────────────────────── */
-.composer{display:flex;gap:12px;padding:10px;border-radius:var(--radius)}
-#chat-input{
-  flex:1;resize:none;border:1px solid #cfd6ec;border-radius:var(--radius);
-  padding:10px;font-size:13px;line-height:1.4;background:#fff;
-  transition:border .15s
+/* Rounded card centred in the reading column, matching the mockup. */
+.composer{
+  display:flex;align-items:flex-end;gap:10px;
+  width:100%;max-width:760px;margin:0 auto;
+  padding:8px 8px 8px 18px;border-radius:22px;
+  background:var(--surface);border:1px solid var(--border);
+  box-shadow:var(--shadow);transition:border-color .15s
 }
-#chat-input:focus{outline:none;border-color:var(--accent)}
+.composer:focus-within{border-color:rgba(40,34,28,.2)}
+#chat-input{
+  flex:1;resize:none;border:none;background:transparent;
+  padding:12px 0;font-size:15px;line-height:1.5;color:var(--fg);
+  font-family:inherit
+}
+#chat-input:focus{outline:none}
+#chat-input::placeholder{color:var(--muted)}
 #send-btn{
-  width:46px;height:46px;border:none;border-radius:50%;background:var(--accent);
-  color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center;
+  width:40px;height:40px;flex:none;border:none;border-radius:12px;background:var(--accent);
+  color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;
   cursor:pointer;transition:.15s
 }
-#send-btn:hover{background:var(--accent-2);transform:translateY(-1px)}
-#send-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+#send-btn:hover{background:var(--accent-2)}
+#send-btn:disabled{opacity:.45;cursor:not-allowed}
 
 /* ─── TYPING INDICATOR ──────────────────────────────────────────── */
 .typing{display:inline-block}
@@ -211,8 +241,8 @@ body{display:flex;flex-direction:column}
   overflow:hidden;
   display:flex;
   flex-direction:column;
-  background:#fbfcff;
-  box-shadow:inset 0 0 0 1px #e2e6f4;
+  background:var(--surface);
+  box-shadow:inset 0 0 0 1px var(--border);
 }
 
 /* Viewer toggle — slim grip vertically centered on the chat/viewer divider,
@@ -248,8 +278,8 @@ body{display:flex;flex-direction:column}
 .viewer.open.collapsed .viewer-toggle-btn{display:flex}
 
 .viewer-head{
-  height:46px;display:flex;justify-content:space-between;align-items:center;
-  padding:0 14px;font-size:13px;font-weight:600;border-bottom:1px solid #dde3f4;
+  height:48px;display:flex;justify-content:space-between;align-items:center;
+  padding:0 16px;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);
   overflow:hidden;white-space:nowrap;
 }
 
@@ -261,7 +291,7 @@ body{display:flex;flex-direction:column}
 }
 
 .doc-loading {
-  color: #667eea;
+  color: var(--accent);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -292,18 +322,19 @@ body{display:flex;flex-direction:column}
   overflow:hidden;transition:height .25s ease;z-index:1200;display:flex;flex-direction:column
 }
 .history-pane.open{height:68vh}
+.history-pane{border:1px solid var(--border)}
 .history-pane header{
   height:46px;display:flex;align-items:center;justify-content:space-between;
-  padding:0 14px;font-weight:600;border-bottom:1px solid #d7dff3
+  padding:0 14px;font-weight:600;border-bottom:1px solid var(--border)
 }
 .history-pane header button{background:none;border:none;font-size:18px;cursor:pointer;opacity:.6}
 #thread-list{flex:1;overflow-y:auto;padding:12px 14px}
 .thread{
-  padding:8px;border-radius:var(--radius);font-size:13px;cursor:pointer;
+  padding:9px 10px;border-radius:10px;font-size:13px;cursor:pointer;
   transition:.2s;display:flex;justify-content:space-between;align-items:center;
 }
-.thread:hover{background:#eef3ff;transform:translateX(4px)}
-.thread.active{background:#dbe5ff}
+.thread:hover{background:var(--surface-2)}
+.thread.active{background:var(--accent-soft)}
 
 .thread-delete{
   background:none;border:none;color:#f44336;font-size:16px;
@@ -332,7 +363,7 @@ body{display:flex;flex-direction:column}
 }
 
 /* ─── FOOTER ────────────────────────────────────────────────────── */
-.page-foot{text-align:center;font-size:12px;color:#6d768b;padding:8px}
+.page-foot{text-align:center;font-size:12px;color:var(--muted);padding:8px}
 
 /* ─── RESPONSIVE ────────────────────────────────────────────────── */
 @media(max-width:900px){
@@ -406,22 +437,25 @@ button:focus {
 }
 
 .welcome-content {
-  max-width: 520px;
+  max-width: 600px;
   width: 100%;
 }
 
+/* Large serif greeting, matching the mockup's Newsreader display type. */
 .welcome-title {
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--fg);
-  margin: 0 0 8px 0;
-  letter-spacing: -0.3px;
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 40px;
+  font-weight: 400;
+  color: #33302b;
+  margin: 0 0 10px 0;
+  letter-spacing: -0.5px;
+  line-height: 1.05;
 }
 
 .welcome-subtitle {
   font-size: 15px;
-  color: #888;
-  margin: 0 0 36px 0;
+  color: var(--muted);
+  margin: 0 0 34px 0;
 }
 
 .welcome-suggestions {
@@ -430,21 +464,32 @@ button:focus {
   gap: 10px;
 }
 
+/* Warm card chips; the leading marker picks up the brand blue. */
 .suggestion-btn {
-  background: #f5f5f7;
-  border: 1px solid #e5e5ea;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 13px 18px;
   font-size: 14px;
-  color: #1a1a2e;
+  color: #4a453d;
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
   line-height: 1.4;
   font-family: inherit;
 }
 
+.suggestion-btn::before {
+  content: "✦";
+  color: var(--accent);
+  font-size: 13px;
+  flex: none;
+}
+
 .suggestion-btn:hover {
-  background: #ebebf0;
-  border-color: #d0d0d8;
+  background: #fff;
+  border-color: rgba(40,34,28,.22);
 }

@@ -59,6 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
   function showWelcomeScreen () {
     if (welcomeScreen) welcomeScreen.classList.remove('hidden');
     chatPanel?.classList.add('chat-empty');
+    const titleEl = welcomeScreen?.querySelector('.welcome-title');
+    if (titleEl) {
+      const h = new Date().getHours();
+      const part = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
+      titleEl.textContent = `Good ${part}`;
+    }
   }
 
   function hideWelcomeScreen () {
