@@ -49,14 +49,18 @@
 
   <!-- VIEWER -->
   <aside id="doc-viewer" class="viewer">
-    <!-- Direct child of .viewer (not .viewer-head) so it is not clipped
-         and stays reachable when the panel is collapsed to zero width. -->
-    <button id="viewer-toggle" class="viewer-toggle-btn" title="Toggle document panel">‹</button>
-    <header class="viewer-head">
-      <span id="doc-title">Document viewer</span>
-      <button id="viewer-close" title="Close">✕</button>
-    </header>
-    <iframe id="doc-frame"></iframe>
+    <!-- Direct child of .viewer (not .viewer-body) so it is never clipped and
+         stays reachable when the panel is collapsed to zero width. -->
+    <button id="viewer-toggle" class="viewer-toggle-btn" title="Toggle document panel">❮</button>
+    <!-- Inner wrapper clips content (overflow:hidden) while .viewer stays
+         overflow:visible so the toggle tab can stick out to the left. -->
+    <div class="viewer-body">
+      <header class="viewer-head">
+        <span id="doc-title">Document viewer</span>
+        <button id="viewer-close" title="Close">✕</button>
+      </header>
+      <iframe id="doc-frame"></iframe>
+    </div>
   </aside>
 </main>
 

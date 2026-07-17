@@ -450,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
     viewer.classList.add('open');
     viewer.classList.remove('collapsed');
     userCollapsedViewer = false;
-    if (viewerToggle) viewerToggle.textContent = '‹';
+    if (viewerToggle) viewerToggle.textContent = '❮';
     viewer.classList.add('loading');
     
     const fullUrl = url.startsWith('http') ? url : `${DOC_BASE}${url}`;
@@ -493,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function closeViewer() {
     viewer.classList.remove('open');
     viewer.classList.remove('collapsed');
-    if (viewerToggle) viewerToggle.textContent = '‹';
+    if (viewerToggle) viewerToggle.textContent = '❮';
     frame.src = '';
     // Must reset: openDoc() early-returns when currentDocUrl === url, so
     // leaving it set makes re-clicking the same reference a no-op.
@@ -510,11 +510,11 @@ document.addEventListener('DOMContentLoaded', () => {
     viewerToggle.addEventListener('click', () => {
       if (viewer.classList.contains('collapsed')) {
         viewer.classList.remove('collapsed');
-        viewerToggle.textContent = '‹';
+        viewerToggle.textContent = '❮';
         userCollapsedViewer = false;
       } else {
         viewer.classList.add('collapsed');
-        viewerToggle.textContent = '›';
+        viewerToggle.textContent = '❯';
         userCollapsedViewer = true;
       }
     });
