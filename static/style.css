@@ -140,37 +140,45 @@ body{display:flex;flex-direction:column}
   color:var(--accent);
 }
 
-/* ─── ANSWER ACTIONS (copy) ─────────────────────────────────────── */
-/* inline-flex so the copy button and the feedback widget (appended later by
-   feedback-integration.js) sit on the same line at the end of an answer. */
+/* ─── ANSWER ACTIONS (copy + feedback) — Claude-style icon row ───── */
+/* A tight row of small, borderless, muted icon buttons right after the answer.
+   The feedback widget (thumbs, appended later by feedback-integration.js) is
+   pulled onto the same line and restyled to match the copy icon. */
 .answer-actions{
-  margin-top:12px;display:inline-flex;gap:8px;vertical-align:middle;
+  margin-top:12px;display:inline-flex;gap:2px;vertical-align:middle;
 }
 
-/* Pull the feedback widget onto the copy button's line: drop its top border
-   and top margin, and make it inline. Higher specificity than the widget's
-   own injected .feedback-container rule, so no !important needed. */
 .msg.ai .feedback-container{
-  display:inline-flex;
+  display:inline-flex;align-items:center;
   vertical-align:middle;
   border-top:none;
-  margin:12px 0 0 10px;
+  margin:12px 0 0 2px;
   padding:0;
-  gap:8px;
+  gap:2px;
 }
 
 /* "Was this helpful?" is redundant — the thumb buttons carry their own
    Helpful / Not helpful tooltips. */
 .msg.ai .feedback-label{ display:none; }
-.copy-btn{
+
+/* Uniform borderless icon buttons for copy + thumbs. */
+.copy-btn,
+.msg.ai .feedback-btn{
   display:inline-flex;align-items:center;justify-content:center;
-  background:transparent;border:1px solid var(--border);border-radius:8px;
-  padding:7px;color:var(--muted);cursor:pointer;
-  transition:.15s;
+  width:28px;height:28px;padding:0;
+  background:transparent;border:none;border-radius:7px;
+  color:var(--muted);cursor:pointer;transition:background .15s,color .15s;
+  line-height:0;
 }
-.copy-btn:hover{color:var(--fg);border-color:rgba(40,34,28,.22);background:var(--surface)}
-.copy-btn.copied{color:var(--accent);border-color:var(--accent)}
-.copy-btn svg{flex:none}
+.copy-btn:hover,
+.msg.ai .feedback-btn:hover:not(:disabled){
+  color:var(--fg);background:rgba(40,34,28,.06);transform:none;
+}
+.copy-btn.copied{color:var(--accent);background:transparent;}
+.msg.ai .feedback-btn.thumbs-up.active{color:#2e9e57;background:transparent;border-color:transparent;}
+.msg.ai .feedback-btn.thumbs-down.active{color:#e0533d;background:transparent;border-color:transparent;}
+.copy-btn svg,
+.msg.ai .feedback-btn svg{flex:none;}
 
 /* ─── SIMPLE REFERENCES ──────────────────────────────────────────── */
 .refs-section{
