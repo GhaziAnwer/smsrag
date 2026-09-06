@@ -5,6 +5,7 @@ from loguru import logger
 import os
 import time
 import re
+import html
 from urllib.parse import quote
 from collections import defaultdict
 
@@ -288,10 +289,31 @@ Source: {breadcrumb}
 # ============================================================================
 MIN_REF_SCORE = float(os.getenv('MIN_REF_SCORE', '0.25'))
 
+_HTML_TAG_RE = re.compile(r'</?[a-zA-Z][^>]*>')   # complete tags: <p style="…">, </p>
+_HTML_DANGLING_RE = re.compile(r'</?[a-zA-Z][^>]*$')  # truncated/unclosed trailing tag: <p style="…
+
+def _strip_html(s: str) -> str:
+    """Strip HTML tags/fragments from a title or breadcrumb captured by the indexer.
+
+    Some section headings were indexed as raw HTML (e.g. '<p style="margin-top:0pt;…">Text</p>'
+    or a bare '<td style="width…'). Left as-is they render as '<p style=' in the reference list
+    and the document viewer's title bar. Remove tags, unescape entities, collapse whitespace.
+    """
+    if not s or '<' not in s:
+        return s.strip() if s else s
+    s = _HTML_TAG_RE.sub(' ', s)        # drop well-formed tags
+    s = _HTML_DANGLING_RE.sub(' ', s)   # drop a trailing unclosed tag fragment
+    s = html.unescape(s)
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
 def _is_machine_id(title: str) -> bool:
     """Return True if title looks like an auto-generated ID, not a human heading."""
     t = title.strip()
     if not t:
+        return True
+    # Leftover HTML tag fragment (should be stripped upstream, but guard anyway)
+    if t.startswith('<') or (('<' in t) and ('style=' in t or '</' in t)):
         return True
     # Numeric-only: '3.2.1', '5.8'
     if re.match(r'^[\d\.]+$', t):
@@ -316,17 +338,19 @@ def _breadcrumb_best(breadcrumb: str) -> str:
     if not breadcrumb:
         return ""
     if '>' in breadcrumb:
-        segments = [s.strip() for s in breadcrumb.split('>')]
+        segments = [_strip_html(s.strip()) for s in breadcrumb.split('>')]
         for seg in reversed(segments):
             if seg and not _is_machine_id(seg):
                 return seg
     # No '>' or all segments are machine IDs — use whole breadcrumb if readable
-    if not _is_machine_id(breadcrumb.strip()):
-        return breadcrumb.strip()
+    whole = _strip_html(breadcrumb.strip())
+    if whole and not _is_machine_id(whole):
+        return whole
     return ""
 
 def _clean_title(title: str, breadcrumb: str) -> str:
-    """Return best human-readable title, discarding machine-generated IDs."""
+    """Return best human-readable title, discarding machine-generated IDs and HTML."""
+    title = _strip_html(title or '')
     if title and not _is_machine_id(title):
         return title
     fallback = _breadcrumb_best(breadcrumb)
@@ -337,10 +361,11 @@ def _clean_breadcrumb(breadcrumb: str) -> str:
     if not breadcrumb:
         return breadcrumb
     if '>' in breadcrumb:
-        segments = [s.strip() for s in breadcrumb.split('>')]
+        segments = [_strip_html(s.strip()) for s in breadcrumb.split('>')]
         clean_segments = [s for s in segments if s and not _is_machine_id(s)]
         return ' > '.join(clean_segments) if clean_segments else breadcrumb
-    return breadcrumb if not _is_machine_id(breadcrumb.strip()) else ""
+    whole = _strip_html(breadcrumb.strip())
+    return whole if whole and not _is_machine_id(whole) else ""
 
 def _build_references(nodes, client_id: Optional[str] = None) -> List[RefItem]:
     """Convert retrieved nodes to RefItem objects with routable URLs."""

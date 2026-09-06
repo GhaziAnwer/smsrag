@@ -18,6 +18,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 from contextlib import contextmanager
@@ -49,11 +50,13 @@ class ClientResult:
     changed_files: list[str] | None = None
     copied_files: list[str] | None = None
     indexed: bool = False
+    pruned_files: list[str] | None = None
     error: str | None = None
 
     def __post_init__(self) -> None:
         self.changed_files = self.changed_files or []
         self.copied_files = self.copied_files or []
+        self.pruned_files = self.pruned_files or []
 
 
 def utc_stamp() -> str:
@@ -289,6 +292,100 @@ def detect_destination_only_files(source_docs_dir: Path, target_docs_dir: Path) 
     source_names = {p.name for p in html_files(source_docs_dir)}
     target_names = {p.name for p in html_files(target_docs_dir)}
     return sorted(target_names - source_names)
+
+
+def normalize_docname(name: str) -> str:
+    """Collapse a document filename so renamed variants map to one key.
+
+    Lowercase, drop the .htm/.html extension, remove every non-alphanumeric char. Both
+    '5.5_z_Appendix_1 -  Sample template' and '5.5_z_Appendix_1 Sample template' -> the same
+    '55zappendix1sampletemplate'. Used to spot stale copies left behind by an upstream rename.
+    """
+    n = name.lower()
+    n = re.sub(r"\.html?$", "", n)
+    n = re.sub(r"[^a-z0-9]", "", n)
+    return n
+
+
+def find_renamed_duplicates(source_docs_dir: Path, target_docs_dir: Path) -> list[str]:
+    """Destination-only HTML files that are a RENAMED copy of a current source file.
+
+    A destination-only file qualifies ONLY when a source file exists with the same normalized
+    name but a different exact name — i.e. the file was renamed upstream in GitLab and the old
+    copy still lingers on the server, producing duplicate references. Destination-only files with
+    NO normalized twin in source are genuinely unique content and are never returned here.
+    """
+    dest_only = detect_destination_only_files(source_docs_dir, target_docs_dir)
+    if not dest_only:
+        return []
+    source_norm: dict[str, str] = {}
+    for p in html_files(source_docs_dir):
+        source_norm.setdefault(normalize_docname(p.name), p.name)
+    renamed = []
+    for name in dest_only:
+        twin = source_norm.get(normalize_docname(name))
+        if twin and twin != name:
+            renamed.append(name)
+    return sorted(renamed)
+
+
+def prune_renamed_duplicates(
+    client: str,
+    source_docs_dir: Path,
+    target_docs_dir: Path,
+    client_root: Path,
+    dry_run: bool,
+) -> list[str]:
+    """Remove stale renamed-duplicate copies for one client (file + Chroma + manifest + JSONL).
+
+    Only auto-synced clients reach here (process_clients iterates SMS_RAG_CLIENTS), so the
+    manually-managed clients are never touched. Every removed file is moved to a timestamped
+    backup dir and its Chroma records are backed up first, so a prune is fully reversible.
+    Returns the list of pruned filenames.
+    """
+    candidates = find_renamed_duplicates(source_docs_dir, target_docs_dir)
+    if not candidates:
+        return []
+
+    if dry_run:
+        for name in candidates:
+            log.info("[%s] [DRY RUN] Would prune renamed-duplicate: %s", client, name)
+        return candidates
+
+    ensure_indexing_imports()
+    store_dir = client_root / "index_store"
+    chroma_dir = store_dir / "chroma"
+    chunks_file = store_dir / "chunks.jsonl"
+    manifest_file = store_dir / "manifest.json"
+    backup_dir = store_dir / "auto_prune_backups" / utc_stamp()
+    docs_backup = backup_dir / "documents"
+    docs_backup.mkdir(parents=True, exist_ok=True)
+
+    db = chromadb.PersistentClient(path=str(chroma_dir))
+    collection = db.get_or_create_collection("docs")
+
+    manifest = load_manifest(manifest_file)
+    pruned: list[str] = []
+    for name in candidates:
+        try:
+            backup_chroma_records(collection, name, backup_dir)
+            removed = delete_chroma_records(collection, name)
+            manifest.get("files", {}).pop(name, None)
+            src_file = target_docs_dir / name
+            if src_file.exists():
+                shutil.move(str(src_file), str(docs_backup / name))
+            log.info("[%s] Pruned renamed-duplicate: %s (%s chunks)", client, name, removed)
+            pruned.append(name)
+        except Exception:
+            log.exception("[%s] Failed to prune %s; leaving it in place", client, name)
+
+    if pruned:
+        # Drop pruned files' rows from chunks.jsonl (keeps all others, adds none).
+        rewrite_chunks_jsonl(chunks_file, set(pruned), [], backup_dir)
+        save_manifest(manifest_file, manifest)
+        log.info("[%s] Pruned %s renamed-duplicate file(s); backup: %s", client, len(pruned), backup_dir)
+
+    return pruned
 
 
 def backup_existing_file(dst: Path, backup_root: Path) -> Path | None:
@@ -703,6 +800,16 @@ def process_clients(args: argparse.Namespace) -> list[ClientResult]:
             else:
                 log.info("[%s] Skipping indexing because nothing changed", client)
 
+            # Prune stale renamed-duplicate copies (runs every sync, even when nothing
+            # changed, so a duplicate left by a past rename is cleaned up on the next run).
+            result.pruned_files = prune_renamed_duplicates(
+                client=client,
+                source_docs_dir=source_docs_dir,
+                target_docs_dir=target_docs_dir,
+                client_root=client_root,
+                dry_run=args.dry_run,
+            )
+
         except Exception as exc:
             result.error = str(exc)
             log.exception("[%s] Failed; continuing with next client", client)
@@ -797,13 +904,17 @@ def main() -> int:
         return 1
 
     failures = [r for r in results if r.error]
-    indexed = [r.client for r in results if r.indexed]
+    pruned = [r.client for r in results if r.pruned_files]
+    # A prune modifies the index too, so treat pruned clients like indexed ones for the
+    # summary line that run_sync.sh greps to decide whether to restart the container.
+    indexed = [r.client for r in results if r.indexed or (r.pruned_files and not args.dry_run)]
     changed = [r.client for r in results if r.changed_files]
 
     log.info("=" * 72)
     log.info("SMS document sync summary")
     log.info("Changed clients: %s", ", ".join(changed) if changed else "none")
     log.info("Indexed clients: %s", ", ".join(indexed) if indexed else "none")
+    log.info("Pruned clients: %s", ", ".join(pruned) if pruned else "none")
     if failures:
         for failure in failures:
             log.error("[%s] Error: %s", failure.client, failure.error)

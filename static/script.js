@@ -724,23 +724,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Copy an answer to the clipboard.
-  messages.addEventListener('click', e => {
+  // Copy text with a fallback for embedded (cross-origin iframe) contexts.
+  // The async Clipboard API needs the iframe to be granted `clipboard-write`
+  // via permissions policy; inside the SAILERP popup embed it is not, so
+  // navigator.clipboard.writeText() rejects (button flashed success but nothing
+  // was copied). Fall back to a hidden-textarea + execCommand('copy'), which
+  // operates on the iframe's own document and works without that grant.
+  async function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (e) { /* fall through to legacy path */ }
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-9999px';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) {
+      console.warn('Copy failed:', e);
+      return false;
+    }
+  }
+
+  // Copy an answer to the clipboard. Only show the success state on a real copy.
+  messages.addEventListener('click', async e => {
     const btn = e.target.closest('.copy-btn');
     if (!btn) return;
     const content = btn.closest('.msg.ai')?.querySelector('.answer-content');
     const text = content ? content.innerText.trim() : '';
     if (!text) return;
-    navigator.clipboard.writeText(text).then(() => {
-      btn.classList.add('copied');
-      btn.title = 'Copied';
-      btn.innerHTML = ICON_CHECK;
-      setTimeout(() => {
-        btn.classList.remove('copied');
-        btn.title = 'Copy';
-        btn.innerHTML = ICON_COPY;
-      }, 1500);
-    }).catch(err => console.warn('Copy failed:', err));
+    const ok = await copyText(text);
+    if (!ok) return;
+    btn.classList.add('copied');
+    btn.title = 'Copied';
+    btn.innerHTML = ICON_CHECK;
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.title = 'Copy';
+      btn.innerHTML = ICON_COPY;
+    }, 1500);
   });
 
   /* ─── INIT ──────────────────────────────────────────────────────── */
